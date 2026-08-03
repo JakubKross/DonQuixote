@@ -1,0 +1,30 @@
+{
+  "type": "FeatureCollection",
+  "name": "site_boundary",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:EPSG::4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Obszar testowy"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [19.0, 52.0],
+            [19.1, 52.0],
+            [19.1, 52.1],
+            [19.0, 52.1],
+            [19.0, 52.0]
+          ]
+        ]
+      }
+    }
+  ]
+}

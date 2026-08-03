@@ -1,0 +1,36 @@
+Metadata-Version: 2.4
+Name: donquixote
+Version: 0.1.0
+Summary: Program wspomagający planowanie instalacji OZE
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: geopandas>=1.0
+Requires-Dist: pyproj>=3.5
+Requires-Dist: shapely>=2.0
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+
+# DonQuixote
+
+Narzędzie wspomagające wstępne planowanie instalacji odnawialnych źródeł energii.
+
+Projekt jest obecnie na etapie budowy fundamentu domenowego. Nie stanowi źródła
+wiążących opinii prawnych ani gwarancji możliwości realizacji inwestycji.
+
+## Rozwój
+
+```bash
+python -m pip install -e ".[dev]"
+pytest
+ruff check .
+mypy src
+```
+
+Wersję programu można wyświetlić poleceniem:
+
+```bash
+donquixote --version
+```

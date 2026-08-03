@@ -1,4 +1,4 @@
-# Renewable Planner
+# DonQuixote
 
 ## Cel projektu
 

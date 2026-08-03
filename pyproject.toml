@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "donquixote"
+version = "0.1.0"
+description = "Program wspomagający planowanie instalacji OZE"
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "geopandas>=1.0",
+    "pyproj>=3.5",
+    "shapely>=2.0",
+]
+
+[project.scripts]
+donquixote = "renewable_planner.cli:main"
+
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+]
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+]
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "B",
+    "UP",
+]
+
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+check_untyped_defs = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+warn_return_any = true
+no_site_packages = true
+ignore_missing_imports = true

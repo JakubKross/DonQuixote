@@ -1,0 +1,9 @@
+geopandas>=1.0
+pyproj>=3.5
+shapely>=2.0
+
+[dev]
+pytest
+pytest-cov
+ruff
+mypy
