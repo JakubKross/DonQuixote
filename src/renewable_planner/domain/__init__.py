@@ -19,6 +19,7 @@ from renewable_planner.domain.scenario import Scenario
 from renewable_planner.domain.site import Site
 from renewable_planner.domain.spatial_constraint import (
     ConstraintCategory,
+    ConstraintLevel,
     SpatialConstraint,
 )
 
@@ -26,6 +27,7 @@ __all__ = [
     "AnalysisRun",
     "AnalysisRunStatus",
     "ConstraintCategory",
+    "ConstraintLevel",
     "ConstraintFinding",
     "CoordinateReferenceSystemError",
     "CoordinateTransformationError",

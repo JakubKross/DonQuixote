@@ -6,6 +6,7 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from renewable_planner.domain.common import SpatialGeometry, require_aware, require_non_empty
+from renewable_planner.domain.spatial_constraint import ConstraintLevel
 
 
 class FindingStatus(StrEnum):
@@ -26,11 +27,16 @@ class ConstraintFinding:
     message: str
     analyzed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     affected_geometry: SpatialGeometry | None = None
+    level: ConstraintLevel = ConstraintLevel.WARNING
+    data_source: str = "unspecified"
+    data_version: str = "unspecified"
     requires_expert_review: bool = True
     id: UUID = field(default_factory=uuid4)
 
     def __post_init__(self) -> None:
         require_non_empty(self.message, "message")
+        require_non_empty(self.data_source, "data_source")
+        require_non_empty(self.data_version, "data_version")
         require_aware(self.analyzed_at, "analyzed_at")
         if self.status is FindingStatus.AFFECTED and self.affected_geometry is None:
             raise ValueError("an affected finding must include affected_geometry")
