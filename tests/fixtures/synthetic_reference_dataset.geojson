@@ -1,0 +1,129 @@
+{
+  "type": "FeatureCollection",
+  "name": "synthetic_reference_dataset",
+  "crs": {
+    "type": "name",
+    "properties": {"name": "EPSG:2180"}
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "entity_type": "site",
+        "entity_id": "00000000-0000-0000-0000-000000000001",
+        "name": "Fikcyjny teren Bursztynowy",
+        "source": "synthetic-reference",
+        "version": "site-2026.01"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[0, 0], [100, 0], [100, 80], [0, 80], [0, 0]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "entity_type": "building",
+        "entity_id": "00000000-0000-0000-0000-000000000011",
+        "name": "Fikcyjny budynek A",
+        "source": "synthetic-buildings",
+        "version": "buildings-2026.01"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[10, 10], [20, 10], [20, 20], [10, 20], [10, 10]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "entity_type": "building",
+        "entity_id": "00000000-0000-0000-0000-000000000012",
+        "name": "Fikcyjny budynek B",
+        "source": "synthetic-buildings",
+        "version": "buildings-2026.01"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[60, 50], [72, 50], [72, 62], [60, 62], [60, 50]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "entity_type": "building",
+        "entity_id": "00000000-0000-0000-0000-000000000013",
+        "name": "Fikcyjny budynek C",
+        "source": "synthetic-buildings",
+        "version": "buildings-2026.01"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[82, 12], [92, 12], [92, 22], [82, 22], [82, 12]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "entity_type": "environmental_area",
+        "entity_id": "00000000-0000-0000-0000-000000000021",
+        "name": "Fikcyjna mokra łąka",
+        "source": "synthetic-environment",
+        "version": "environment-2026.01"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[25, 10], [45, 10], [45, 30], [25, 30], [25, 10]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "entity_type": "infrastructure",
+        "entity_id": "00000000-0000-0000-0000-000000000031",
+        "name": "Fikcyjna linia techniczna",
+        "source": "synthetic-infrastructure",
+        "version": "infrastructure-2026.01"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[5, 65], [95, 65]]
+      }
+    }
+  ],
+  "rules": [
+    {
+      "id": "10000000-0000-0000-0000-000000000001",
+      "name": "Odsunięcie od budynków",
+      "category": "legal",
+      "level": "exclusion",
+      "required_layer": "buildings",
+      "buffer_meters": 2.0,
+      "source": "synthetic-rule-catalogue",
+      "rule_version": "rule-buildings-2026.01",
+      "valid_from": "2026-01-01"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000002",
+      "name": "Fikcyjny obszar środowiskowy",
+      "category": "environmental",
+      "level": "exclusion",
+      "required_layer": "environmental-area",
+      "buffer_meters": 0.0,
+      "source": "synthetic-rule-catalogue",
+      "rule_version": "rule-environment-2026.01",
+      "valid_from": "2026-01-01"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000003",
+      "name": "Sąsiedztwo infrastruktury",
+      "category": "technical",
+      "level": "conditional",
+      "required_layer": "infrastructure",
+      "buffer_meters": 0.0,
+      "source": "synthetic-rule-catalogue",
+      "rule_version": "rule-infrastructure-2026.01",
+      "valid_from": "2026-01-01"
+    }
+  ]
+}
