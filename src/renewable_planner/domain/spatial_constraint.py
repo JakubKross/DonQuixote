@@ -41,6 +41,8 @@ class SpatialConstraint:
     required_layer: str | None = None
     buffer_meters: float = 0.0
     id: UUID = field(default_factory=uuid4)
+    operation: str = "intersects"
+    legal_basis: str | None = None
 
     def __post_init__(self) -> None:
         require_non_empty(self.name, "name")
@@ -58,6 +60,9 @@ class SpatialConstraint:
             raise ValueError("geometry is required when required_layer is not configured")
         if self.buffer_meters < 0:
             raise ValueError("buffer_meters must not be negative")
+        require_non_empty(self.operation, "operation")
+        if self.legal_basis is not None:
+            require_non_empty(self.legal_basis, "legal_basis")
         if self.valid_to is not None and self.valid_to < self.valid_from:
             raise ValueError("valid_to must not be earlier than valid_from")
 

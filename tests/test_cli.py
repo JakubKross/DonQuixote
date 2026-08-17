@@ -53,7 +53,10 @@ def test_cli_screen_site_writes_summary_and_spatial_outputs(
     assert metadata["analysis_run"]["status"] == "completed"
     assert metadata["warnings"] == 1
     assert metadata["data_versions"]["layer:buildings"] == "v1"
-    assert metadata["data_versions"]["rule:20000000-0000-0000-0000-000000000001"] == "rules-v1"
+    assert (
+        metadata["data_versions"]["rule:20000000-0000-0000-0000-000000000001"]
+        == "yaml:20000000-0000-0000-0000-000000000001"
+    )
     assert json.loads((output / "available_area.geojson").read_text(encoding="utf-8"))["type"] == (
         "FeatureCollection"
     )
