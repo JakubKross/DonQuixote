@@ -14,10 +14,12 @@ dependencies = [
     "geopandas>=1.0",
     "pyproj>=3.5",
     "shapely>=2.0",
+    "PyYAML>=6.0",
 ]
 
 [project.scripts]
 donquixote = "renewable_planner.cli:main"
+renewable-planner = "renewable_planner.cli:main"
 
 
 [project.optional-dependencies]

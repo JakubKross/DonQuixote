@@ -1,5 +1,17 @@
 """Spatial infrastructure adapters."""
 
+from renewable_planner.adapters.geospatial.file_screening import (
+    FileProjectRepository,
+    FileScreeningError,
+    FileSiteRepository,
+    GeoJsonConstraintLayerProvider,
+    JsonResultRepository,
+    MemoryAnalysisRunRepository,
+    YamlSpatialRuleProvider,
+    build_project,
+    load_site,
+    write_screening_outputs,
+)
 from renewable_planner.adapters.geospatial.geojson_site_boundary import (
     BoundaryFileNotConfiguredError,
     BoundaryFileNotFoundError,
@@ -27,6 +39,10 @@ __all__ = [
     "BoundaryFileNotConfiguredError",
     "BoundaryFileNotFoundError",
     "CoordinateReferenceSystemMismatchError",
+    "FileProjectRepository",
+    "FileScreeningError",
+    "FileSiteRepository",
+    "GeoJsonConstraintLayerProvider",
     "EmptyBoundaryLayerError",
     "GeoJsonBoundaryError",
     "GeoJsonSiteBoundaryProvider",
@@ -34,10 +50,16 @@ __all__ = [
     "InvalidBoundaryGeometryError",
     "InvalidGeoJsonError",
     "InvalidSpatialGeometryError",
+    "JsonResultRepository",
+    "MemoryAnalysisRunRepository",
     "MissingBoundaryGeometryError",
     "MissingCrsError",
     "MultipleBoundaryGeometriesError",
     "PyprojCoordinateReferenceSystemService",
     "SpatialOperationError",
     "UnsupportedCrsError",
+    "YamlSpatialRuleProvider",
+    "build_project",
+    "load_site",
+    "write_screening_outputs",
 ]
