@@ -22,6 +22,11 @@ from renewable_planner.domain.spatial_constraint import (
     ConstraintLevel,
     SpatialConstraint,
 )
+from renewable_planner.domain.spatial_screening import (
+    ScreenSiteResult,
+    SpatialDataLayer,
+    SpatialRuleEngineResult,
+)
 
 __all__ = [
     "AnalysisRun",
@@ -40,9 +45,12 @@ __all__ = [
     "NonMetricCoordinateReferenceSystemError",
     "Project",
     "Scenario",
+    "ScreenSiteResult",
     "Site",
     "SpatialConstraint",
+    "SpatialDataLayer",
     "SpatialGeometry",
+    "SpatialRuleEngineResult",
     "UnrecognizedCoordinateReferenceSystemError",
     "normalize_crs",
 ]
