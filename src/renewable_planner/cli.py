@@ -22,6 +22,8 @@ from renewable_planner.adapters.geospatial.file_screening import (
     load_site,
     write_screening_outputs,
 )
+from renewable_planner.adapters.reporting import TextAnalysisReportGenerator
+from renewable_planner.application.reporting import GenerateAnalysisReport
 from renewable_planner.application.spatial import (
     ScreenSite,
     ScreenSiteCommand,
@@ -102,6 +104,8 @@ def _run_screen_site(arguments: argparse.Namespace) -> None:
         )
     )
     write_screening_outputs(result, arguments.output)
+    report = GenerateAnalysisReport(TextAnalysisReportGenerator()).execute(project, result)
+    (arguments.output / "report.txt").write_text(report, encoding="utf-8")
     spatial = result.spatial_result
     warnings = sum(
         finding.level.value == "warning" and finding.status.value == "affected"

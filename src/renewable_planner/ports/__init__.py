@@ -9,6 +9,7 @@ from renewable_planner.ports.screening import (
     SpatialRuleEvaluator,
     SpatialRuleProvider,
 )
+from renewable_planner.ports.reporting import AnalysisReportGenerator, AnalysisReportRequest
 from renewable_planner.ports.spatial import (
     ConstraintLayerProvider,
     CoordinateReferenceSystemService,
@@ -19,6 +20,8 @@ from renewable_planner.ports.spatial import (
 
 __all__ = [
     "AnalysisRunRepository",
+    "AnalysisReportGenerator",
+    "AnalysisReportRequest",
     "ConstraintLayerProvider",
     "CoordinateReferenceSystemService",
     "ProjectRepository",

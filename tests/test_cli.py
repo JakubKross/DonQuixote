@@ -62,6 +62,26 @@ def test_cli_screen_site_writes_summary_and_spatial_outputs(
     )
     assert json.loads((output / "excluded_areas.geojson").read_text(encoding="utf-8"))["features"]
 
+    report = (output / "report.txt").read_text(encoding="utf-8")
+    for section in (
+        "Nazwa projektu:",
+        "Identyfikator analizy:",
+        "Data uruchomienia:",
+        "Technologia:",
+        "ŹRÓDŁA I WERSJE DANYCH",
+        "ZASTOSOWANE REGUŁY",
+        "WYKRYTE WYKLUCZENIA",
+        "OSTRZEŻENIA",
+        "PODSUMOWANIE POWIERZCHNI",
+        "Powierzchnia początkowa:",
+        "Powierzchnia wykluczona:",
+        "Powierzchnia dostępna:",
+        "OGRANICZENIA WYNIKU",
+        "nie jest wiążącą opinią prawną",
+        "nie gwarantuje możliwości realizacji inwestycji",
+    ):
+        assert section in report
+
 
 def test_cli_rejects_missing_input_file(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exit_info:
