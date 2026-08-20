@@ -18,9 +18,9 @@
 - wyznaczanie dostępnego obszaru;
 - `metadata.json`, warstwy GeoJSON i tekstowy raport wynikowy.
 
-## Etap 2 — moduł wiatrowy — następny etap
+## Etap 2 — moduł wiatrowy — pierwszy zakres rozpoczęty
 
-- katalog turbin;
+- podstawowy katalog turbin z odczytem YAML/JSON — wykonany;
 - dane wiatrowe;
 - uproszczony godzinowy profil produkcji;
 - generowanie rozmieszczenia;

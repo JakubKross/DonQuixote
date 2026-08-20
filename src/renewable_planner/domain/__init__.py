@@ -27,6 +27,12 @@ from renewable_planner.domain.spatial_screening import (
     SpatialDataLayer,
     SpatialRuleEngineResult,
 )
+from renewable_planner.domain.wind_turbine import (
+    PowerCurvePoint,
+    WindTurbine,
+    WindTurbineCatalog,
+    WindTurbineValidationError,
+)
 
 __all__ = [
     "AnalysisRun",
@@ -52,5 +58,9 @@ __all__ = [
     "SpatialGeometry",
     "SpatialRuleEngineResult",
     "UnrecognizedCoordinateReferenceSystemError",
+    "PowerCurvePoint",
+    "WindTurbine",
+    "WindTurbineCatalog",
+    "WindTurbineValidationError",
     "normalize_crs",
 ]

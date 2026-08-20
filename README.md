@@ -4,7 +4,8 @@ DonQuixote jest narzędziem do wstępnego planowania instalacji OZE w Polsce.
 Aktualna wersja wykonuje przestrzenny screening obszaru na podstawie granicy
 terenu, warstw ograniczeń i wersjonowanych reguł zapisanych w YAML. Pierwsza
 wersja koncentruje się na przygotowaniu fundamentu pod analizę lądowych farm
-wiatrowych; nie oblicza jeszcze produkcji energii ani rozmieszczenia turbin.
+wiatrowych oraz zawiera podstawowy, konfigurowalny katalog turbin; nie oblicza
+jeszcze produkcji energii ani rozmieszczenia turbin.
 
 Wynik jest materiałem pomocniczym do dalszej analizy. Nie jest wiążącą opinią
 prawną, nie gwarantuje możliwości realizacji inwestycji i wymaga sprawdzenia
@@ -84,7 +85,8 @@ HTML lub PDF bez zmiany warstwy aplikacyjnej.
 
 ## Obecne ograniczenia
 
-- brak katalogu turbin, danych wiatrowych i modelu produkcji;
+- katalog turbin zawiera wyłącznie dane dostarczone w konfiguracji — brak
+  urzędowego katalogu producentów i danych wiatrowych;
 - brak rozmieszczania turbin, minimalnych odległości technologicznych i modelu wake;
 - brak integracji z PyWake, pvlib, bazą danych, PostGIS i zewnętrznymi API;
 - brak interfejsu mapowego — dostępny jest tylko CLI;
@@ -94,6 +96,6 @@ HTML lub PDF bez zmiany warstwy aplikacyjnej.
 
 ## Następny etap
 
-Następnym etapem jest moduł wiatrowy: katalog turbin, źródło danych wiatrowych,
-uproszczony godzinowy profil produkcji, generowanie rozmieszczenia turbin i
-minimalne odstępy. Dopiero po nim planowany jest adapter modelu wake z PyWake.
+Następnym zakresem modułu wiatrowego są źródło danych wiatrowych, uproszczony
+godzinowy profil produkcji, generowanie rozmieszczenia turbin i minimalne
+odstępy. Dopiero po nim planowany jest adapter modelu wake z PyWake.
