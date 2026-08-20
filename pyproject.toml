@@ -29,6 +29,9 @@ dev = [
     "ruff",
     "mypy",
 ]
+pywake = [
+    "py-wake>=2.6",
+]
 
 
 [tool.setuptools.packages.find]
@@ -41,6 +44,9 @@ pythonpath = ["src"]
 addopts = [
     "-ra",
     "--strict-markers",
+]
+markers = [
+    "pywake: integration tests requiring the optional PyWake dependency",
 ]
 
 

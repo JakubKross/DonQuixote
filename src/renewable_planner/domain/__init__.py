@@ -38,6 +38,11 @@ from renewable_planner.domain.wind_production import (
     WindProductionModel,
     WindProductionValidationError,
 )
+from renewable_planner.domain.wind_simulation import (
+    WindSimulationRequest,
+    WindSimulationResult,
+    WindSimulationValidationError,
+)
 from renewable_planner.domain.wind_turbine import (
     PowerCurvePoint,
     WindTurbine,
@@ -80,5 +85,8 @@ __all__ = [
     "WindLayoutValidationError",
     "WindProductionModel",
     "WindProductionValidationError",
+    "WindSimulationRequest",
+    "WindSimulationResult",
+    "WindSimulationValidationError",
     "normalize_crs",
 ]

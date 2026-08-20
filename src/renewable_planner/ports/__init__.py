@@ -17,6 +17,7 @@ from renewable_planner.ports.spatial import (
     SiteBoundaryProvider,
     SpatialOperations,
 )
+from renewable_planner.ports.wind import WindFarmSimulator
 
 __all__ = [
     "AnalysisRunRepository",
@@ -33,4 +34,5 @@ __all__ = [
     "SpatialOperations",
     "SpatialRuleEvaluator",
     "SpatialRuleProvider",
+    "WindFarmSimulator",
 ]

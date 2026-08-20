@@ -23,6 +23,12 @@ python -m pip install -e ".[dev]"
 Główne zależności to GeoPandas, PyProj, Shapely i PyYAML. Instalacja w
 środowisku wirtualnym jest zalecana.
 
+Opcjonalny adapter PyWake można doinstalować poleceniem:
+
+```bash
+python -m pip install -e ".[pywake]"
+```
+
 ## Testy i kontrola jakości
 
 ```bash
