@@ -4,9 +4,8 @@ from renewable_planner.domain.constraint_finding import ConstraintFinding, Findi
 from renewable_planner.domain.spatial_constraint import ConstraintLevel
 from renewable_planner.ports.reporting import AnalysisReportGenerator, AnalysisReportRequest
 
-
 DISCLAIMER = (
-    "Wynik służy wyłącznie do wstępnego screeningu. Nie jest wiążącą opinią prawną, "
+    "Wynik służy wyłącznie do wstępnego screeningu; nie jest wiążącą opinią prawną, "
     "wymaga sprawdzenia aktualności danych i nie gwarantuje możliwości realizacji inwestycji."
 )
 
@@ -72,7 +71,8 @@ class TextAnalysisReportGenerator(AnalysisReportGenerator):
                 "",
                 "OGRANICZENIA WYNIKU",
                 f"- {DISCLAIMER}",
-                "- Wynik wymaga weryfikacji przez właściwych ekspertów i na podstawie aktualnych danych.",
+                "- Wynik wymaga weryfikacji przez właściwych ekspertów i na podstawie "
+                "aktualnych danych.",
                 "",
             ]
         )

@@ -1,5 +1,6 @@
 """Ports implemented by infrastructure adapters."""
 
+from renewable_planner.ports.reporting import AnalysisReportGenerator, AnalysisReportRequest
 from renewable_planner.ports.screening import (
     AnalysisRunRepository,
     ProjectRepository,
@@ -9,7 +10,6 @@ from renewable_planner.ports.screening import (
     SpatialRuleEvaluator,
     SpatialRuleProvider,
 )
-from renewable_planner.ports.reporting import AnalysisReportGenerator, AnalysisReportRequest
 from renewable_planner.ports.spatial import (
     ConstraintLayerProvider,
     CoordinateReferenceSystemService,
