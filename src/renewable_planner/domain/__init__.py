@@ -27,6 +27,17 @@ from renewable_planner.domain.spatial_screening import (
     SpatialDataLayer,
     SpatialRuleEngineResult,
 )
+from renewable_planner.domain.wind_layout import (
+    AvailableArea,
+    GridTurbineCandidateGenerator,
+    TurbinePosition,
+    TurbineSpacing,
+    WindLayoutValidationError,
+)
+from renewable_planner.domain.wind_production import (
+    WindProductionModel,
+    WindProductionValidationError,
+)
 from renewable_planner.domain.wind_turbine import (
     PowerCurvePoint,
     WindTurbine,
@@ -62,5 +73,12 @@ __all__ = [
     "WindTurbine",
     "WindTurbineCatalog",
     "WindTurbineValidationError",
+    "AvailableArea",
+    "GridTurbineCandidateGenerator",
+    "TurbinePosition",
+    "TurbineSpacing",
+    "WindLayoutValidationError",
+    "WindProductionModel",
+    "WindProductionValidationError",
     "normalize_crs",
 ]
