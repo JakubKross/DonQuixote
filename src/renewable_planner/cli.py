@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 
 from renewable_planner import __version__
+from renewable_planner.adapters.battery_catalog import BatteryCatalogError, load_battery_catalog
 from renewable_planner.adapters.geospatial import (
     PyprojCoordinateReferenceSystemService,
     ShapelyAvailableAreaExtractor,
@@ -48,6 +49,7 @@ from renewable_planner.application.solar import (
     SizeSolarArrayCommand,
 )
 from renewable_planner.application.spatial import ScreenSiteCommand, ScreenSiteError
+from renewable_planner.application.storage import DispatchBattery, DispatchBatteryCommand
 from renewable_planner.application.wind import (
     GenerateTurbineLayout,
     GenerateTurbineLayoutCommand,
@@ -56,6 +58,9 @@ from renewable_planner.application.wind import (
 )
 from renewable_planner.composition import build_file_screen_site, build_text_report_generator
 from renewable_planner.domain import (
+    Battery,
+    BatteryCatalog,
+    BatteryDispatchResult,
     EnergyProfile,
     GridConnectionLimit,
     GroundCoverageRatio,
@@ -141,6 +146,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="optional grid connection export limit (MW); combines and curtails "
         "whichever wind/solar production simulations were run",
     )
+    screen_site.add_argument(
+        "--battery-catalog",
+        type=Path,
+        help="optional battery catalogue (YAML/JSON) to charge with curtailed surplus "
+        "and discharge to fill gaps below --grid-connection-limit-mw",
+    )
+    screen_site.add_argument("--battery-manufacturer")
+    screen_site.add_argument("--battery-model")
+    screen_site.add_argument(
+        "--battery-initial-soc",
+        type=float,
+        help="initial state of charge as a fraction (defaults to the battery's minimum)",
+    )
     return parser
 
 
@@ -181,6 +199,7 @@ def _run_screen_site(arguments: argparse.Namespace) -> None:
     _validate_solar_arguments(arguments)
     _validate_solar_simulation_arguments(arguments)
     _validate_hybrid_arguments(arguments)
+    _validate_battery_arguments(arguments)
 
     site = load_site(arguments.site)
     use_case, project = build_file_screen_site(
@@ -230,7 +249,18 @@ def _run_screen_site(arguments: argparse.Namespace) -> None:
             arguments, wind_simulation_result, solar_simulation_result
         )
 
-    report = build_text_report_generator().execute(project, result)
+    battery_dispatch_result: BatteryDispatchResult | None = None
+    if arguments.battery_catalog is not None and hybrid_result is not None:
+        battery_dispatch_result = _dispatch_battery(arguments, hybrid_result.aggregate_profile)
+
+    report = build_text_report_generator().execute(
+        project,
+        result,
+        wind_simulation_result,
+        solar_simulation_result,
+        hybrid_result,
+        battery_dispatch_result,
+    )
     (arguments.output / "report.txt").write_text(report, encoding="utf-8")
 
 
@@ -256,6 +286,7 @@ def _validate_turbine_arguments(arguments: argparse.Namespace) -> None:
     if bool(arguments.turbine_manufacturer) != bool(arguments.turbine_model):
         raise FileScreeningError("--turbine-manufacturer and --turbine-model must be used together")
 
+
 def _validate_wind_simulation_arguments(arguments: argparse.Namespace) -> None:
     if arguments.wind_resource is None:
         if arguments.use_pywake:
@@ -266,11 +297,13 @@ def _validate_wind_simulation_arguments(arguments: argparse.Namespace) -> None:
     if not arguments.wind_resource.is_file():
         raise FileScreeningError(f"wind-resource file does not exist: {arguments.wind_resource}")
 
+
 def _load_turbine_catalog(path: Path) -> WindTurbineCatalog:
     try:
         return load_wind_turbine_catalog(path)
     except WindTurbineCatalogError as error:
         raise FileScreeningError(str(error)) from error
+
 
 def _place_turbines(
     arguments: argparse.Namespace,
@@ -297,6 +330,7 @@ def _place_turbines(
     print(f"Liczba wygenerowanych pozycji turbin: {len(positions)}")
     return positions
 
+
 def _select_turbine(
     catalog: WindTurbineCatalog,
     manufacturer: str | None,
@@ -313,6 +347,7 @@ def _select_turbine(
             "catalog contains more than one turbine"
         )
     return catalog.turbines[0]
+
 
 def _simulate_wind_production(
     arguments: argparse.Namespace,
@@ -369,6 +404,7 @@ def _validate_solar_arguments(arguments: argparse.Namespace) -> None:
     if bool(arguments.solar_manufacturer) != bool(arguments.solar_model):
         raise FileScreeningError("--solar-manufacturer and --solar-model must be used together")
 
+
 def _validate_solar_simulation_arguments(arguments: argparse.Namespace) -> None:
     if arguments.solar_resource is None:
         if arguments.use_pvlib:
@@ -379,11 +415,13 @@ def _validate_solar_simulation_arguments(arguments: argparse.Namespace) -> None:
     if not arguments.solar_resource.is_file():
         raise FileScreeningError(f"solar-resource file does not exist: {arguments.solar_resource}")
 
+
 def _load_solar_catalog(path: Path) -> SolarModuleCatalog:
     try:
         return load_solar_module_catalog(path)
     except SolarModuleCatalogError as error:
         raise FileScreeningError(str(error)) from error
+
 
 def _select_solar_module(
     catalog: SolarModuleCatalog,
@@ -403,6 +441,7 @@ def _select_solar_module(
             "catalog contains more than one module"
         )
     return catalog.modules[0]
+
 
 def _size_solar_array(
     arguments: argparse.Namespace,
@@ -426,6 +465,7 @@ def _size_solar_array(
         f"(moc zainstalowana: {layout.installed_capacity_w / 1000:.2f} kWp)"
     )
     return layout.module_count
+
 
 def _simulate_solar_production(
     arguments: argparse.Namespace,
@@ -478,6 +518,7 @@ def _validate_hybrid_arguments(arguments: argparse.Namespace) -> None:
             "--grid-connection-limit-mw requires --wind-resource and/or --solar-resource"
         )
 
+
 def _aggregate_hybrid_production(
     arguments: argparse.Namespace,
     wind_simulation_result: WindSimulationResult | None,
@@ -522,4 +563,85 @@ def _aggregate_hybrid_production(
         f"({curtailment.curtailed_energy_fraction * 100:.2f}%)"
     )
     print(f"Wykorzystanie przyłącza: {curtailment.utilization_fraction * 100:.2f}%")
+    return result
+
+
+def _validate_battery_arguments(arguments: argparse.Namespace) -> None:
+    battery_options = (
+        arguments.battery_manufacturer,
+        arguments.battery_model,
+        arguments.battery_initial_soc,
+    )
+    if arguments.battery_catalog is None:
+        if any(option is not None for option in battery_options):
+            raise FileScreeningError("battery options require --battery-catalog")
+        return
+    if not arguments.battery_catalog.is_file():
+        raise FileScreeningError(
+            f"battery-catalog file does not exist: {arguments.battery_catalog}"
+        )
+    if arguments.grid_connection_limit_mw is None:
+        raise FileScreeningError("--battery-catalog requires --grid-connection-limit-mw")
+    if bool(arguments.battery_manufacturer) != bool(arguments.battery_model):
+        raise FileScreeningError("--battery-manufacturer and --battery-model must be used together")
+
+
+def _load_battery_catalog(path: Path) -> BatteryCatalog:
+    try:
+        return load_battery_catalog(path)
+    except BatteryCatalogError as error:
+        raise FileScreeningError(str(error)) from error
+
+
+def _select_battery(
+    catalog: BatteryCatalog,
+    manufacturer: str | None,
+    model_name: str | None,
+) -> Battery:
+    if manufacturer and model_name:
+        battery = catalog.find(manufacturer, model_name)
+        if battery is None:
+            raise FileScreeningError(f"battery not found in catalog: {manufacturer} {model_name}")
+        return battery
+    if len(catalog.batteries) != 1:
+        raise FileScreeningError(
+            "--battery-manufacturer and --battery-model are required when the "
+            "catalog contains more than one battery"
+        )
+    return catalog.batteries[0]
+
+
+def _dispatch_battery(
+    arguments: argparse.Namespace,
+    aggregate_profile: EnergyProfile,
+) -> BatteryDispatchResult:
+    """Charge/discharge the selected battery against the hybrid aggregate profile.
+
+    Runs on the same aggregate profile and grid limit that the plain
+    curtailment summary used, so the report can show the improvement a
+    battery makes over simple curtailment.
+    """
+    catalog = _load_battery_catalog(arguments.battery_catalog)
+    battery = _select_battery(catalog, arguments.battery_manufacturer, arguments.battery_model)
+    initial_soc = (
+        arguments.battery_initial_soc
+        if arguments.battery_initial_soc is not None
+        else battery.min_state_of_charge_fraction
+    )
+
+    use_case = DispatchBattery()
+    result = use_case.execute(
+        DispatchBatteryCommand(
+            profile=aggregate_profile,
+            battery=battery,
+            target_power_mw=arguments.grid_connection_limit_mw,
+            initial_state_of_charge_fraction=initial_soc,
+        )
+    )
+
+    print(f"Naładowano: {result.charged_energy_mwh:.2f} MWh")
+    print(f"Rozładowano: {result.discharged_energy_mwh:.2f} MWh")
+    print(f"Straty magazynu: {result.round_trip_loss_mwh:.2f} MWh")
+    print(f"Curtailment po wsparciu magazynu: {result.curtailed_energy_mwh:.2f} MWh")
+    print(f"Końcowy stan naładowania: {result.final_state_of_charge_fraction * 100:.2f}%")
     return result

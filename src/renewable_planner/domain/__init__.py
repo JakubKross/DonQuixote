@@ -1,6 +1,13 @@
 """Public domain model."""
 
 from renewable_planner.domain.analysis_run import AnalysisRun, AnalysisRunStatus
+from renewable_planner.domain.battery import Battery, BatteryCatalog, BatteryValidationError
+from renewable_planner.domain.battery_dispatch import (
+    BatteryDispatcher,
+    BatteryDispatchResult,
+    BatteryDispatchSample,
+    BatteryDispatchValidationError,
+)
 from renewable_planner.domain.common import SpatialGeometry
 from renewable_planner.domain.constraint_finding import ConstraintFinding, FindingStatus
 from renewable_planner.domain.crs import (
@@ -90,6 +97,13 @@ from renewable_planner.domain.wind_turbine import (
 __all__ = [
     "AnalysisRun",
     "AnalysisRunStatus",
+    "Battery",
+    "BatteryCatalog",
+    "BatteryDispatcher",
+    "BatteryDispatchResult",
+    "BatteryDispatchSample",
+    "BatteryDispatchValidationError",
+    "BatteryValidationError",
     "ConstraintCategory",
     "ConstraintLevel",
     "ConstraintFinding",

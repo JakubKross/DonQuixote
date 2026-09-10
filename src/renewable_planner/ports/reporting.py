@@ -3,8 +3,12 @@
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from renewable_planner.domain.battery_dispatch import BatteryDispatchResult
+from renewable_planner.domain.hybrid_production import HybridProductionResult
 from renewable_planner.domain.project import Project
+from renewable_planner.domain.solar_simulation import SolarSimulationResult
 from renewable_planner.domain.spatial_screening import ScreenSiteResult
+from renewable_planner.domain.wind_simulation import WindSimulationResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,6 +17,10 @@ class AnalysisReportRequest:
 
     project: Project
     result: ScreenSiteResult
+    wind_simulation_result: WindSimulationResult | None = None
+    solar_simulation_result: SolarSimulationResult | None = None
+    hybrid_result: HybridProductionResult | None = None
+    battery_dispatch_result: BatteryDispatchResult | None = None
 
 
 @runtime_checkable

@@ -665,6 +665,118 @@ def test_cli_rejects_grid_connection_limit_without_any_resource(
     )
 
 
+def test_cli_dispatches_battery_and_reduces_curtailment(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = tmp_path / "screening"
+
+    exit_code = main(
+        _screen_site_args(
+            output,
+            turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+            turbine_spacing_rotor_diameters="1",
+            wind_resource=str(FIXTURES / "wind_resource_sample.yaml"),
+            grid_connection_limit_mw="0.0001",
+            battery_catalog=str(FIXTURES / "cli_battery_catalog.yaml"),
+        )
+    )
+
+    assert exit_code == 0
+    summary = capsys.readouterr().out
+    assert "Naładowano:" in summary
+    assert "Curtailment po wsparciu magazynu:" in summary
+
+    report = (output / "report.txt").read_text(encoding="utf-8")
+    assert "MAGAZYN ENERGII (BATERIA)" in report
+    assert "Symulacji magazynu energii nie uruchomiono" not in report
+
+    # The battery should absorb at least some of the surplus that plain
+    # curtailment (without a battery) would have thrown away.
+    plain_curtailment = float(
+        next(
+            line.split(":")[1].split("MWh")[0].strip()
+            for line in report.splitlines()
+            if line.startswith("Curtailment:")
+        )
+    )
+    battery_curtailment = float(
+        next(
+            line.split(":")[1].split("MWh")[0].strip()
+            for line in report.splitlines()
+            if line.startswith("Curtailment po wsparciu magazynu:")
+        )
+    )
+    assert battery_curtailment < plain_curtailment
+
+
+def test_cli_rejects_battery_options_without_catalog(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                battery_initial_soc="0.5",
+            )
+        )
+
+    assert exit_info.value.code == 2
+
+
+def test_cli_rejects_battery_catalog_without_grid_connection_limit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+                turbine_spacing_rotor_diameters="1",
+                wind_resource=str(FIXTURES / "wind_resource_sample.yaml"),
+                battery_catalog=str(FIXTURES / "cli_battery_catalog.yaml"),
+            )
+        )
+
+    assert "--battery-catalog requires --grid-connection-limit-mw" in capsys.readouterr().err
+
+
+def test_cli_rejects_battery_manufacturer_without_model(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+                turbine_spacing_rotor_diameters="1",
+                wind_resource=str(FIXTURES / "wind_resource_sample.yaml"),
+                grid_connection_limit_mw="0.0001",
+                battery_catalog=str(FIXTURES / "cli_battery_catalog.yaml"),
+                battery_manufacturer="Fikcyjny Storage",
+            )
+        )
+
+    assert "must be used together" in capsys.readouterr().err
+
+
+def test_cli_rejects_unknown_battery_selection(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+                turbine_spacing_rotor_diameters="1",
+                wind_resource=str(FIXTURES / "wind_resource_sample.yaml"),
+                grid_connection_limit_mw="0.0001",
+                battery_catalog=str(FIXTURES / "cli_battery_catalog.yaml"),
+                battery_manufacturer="Nieznany",
+                battery_model="Nieznany",
+            )
+        )
+
+    assert "battery not found in catalog" in capsys.readouterr().err
+
+
 def test_cli_rejects_missing_input_file(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exit_info:
         main(

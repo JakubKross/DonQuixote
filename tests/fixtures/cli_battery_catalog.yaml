@@ -1,0 +1,11 @@
+batteries:
+  - manufacturer: "Fikcyjny Storage"
+    model_name: "FB-100"
+    capacity_mwh: 1.0
+    max_charge_power_mw: 1.0
+    max_discharge_power_mw: 1.0
+    round_trip_efficiency_percent: 90.0
+    min_state_of_charge_fraction: 0.0
+    max_state_of_charge_fraction: 1.0
+    data_source: "synthetic-test-dataset"
+    data_version: "test-v1"
