@@ -2,8 +2,10 @@
 
 from renewable_planner.ports.reporting import AnalysisReportGenerator, AnalysisReportRequest
 from renewable_planner.ports.screening import (
+    AnalysisRunQuery,
     AnalysisRunRepository,
     ProjectRepository,
+    ScreeningResultQuery,
     SiteRepository,
     SiteScreeningResultRepository,
     SpatialDataLayerProvider,
@@ -25,6 +27,7 @@ from renewable_planner.ports.wind import (
 )
 
 __all__ = [
+    "AnalysisRunQuery",
     "AnalysisRunRepository",
     "AnalysisReportGenerator",
     "AnalysisReportRequest",
@@ -32,6 +35,7 @@ __all__ = [
     "ConstraintLayerProvider",
     "CoordinateReferenceSystemService",
     "ProjectRepository",
+    "ScreeningResultQuery",
     "ScreeningResultRepository",
     "SiteRepository",
     "SiteBoundaryProvider",

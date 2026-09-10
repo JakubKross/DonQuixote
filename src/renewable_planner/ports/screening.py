@@ -79,3 +79,23 @@ class SiteScreeningResultRepository(Protocol):
     def save(self, result: ScreenSiteResult) -> None:
         """Persist the standardized, traceable screening result."""
         ...
+
+
+@runtime_checkable
+class AnalysisRunQuery(Protocol):
+    """Read side of analysis-run persistence, used by interfaces that poll
+    or look up a run after ``ScreenSite`` has returned (e.g. a web API)."""
+
+    def get(self, analysis_run_id: UUID) -> AnalysisRun | None:
+        """Return an analysis run by id, or None when it does not exist."""
+        ...
+
+
+@runtime_checkable
+class ScreeningResultQuery(Protocol):
+    """Read side of screening-result persistence, used by interfaces that
+    fetch a previously computed result (e.g. a web API)."""
+
+    def get(self, analysis_run_id: UUID) -> ScreenSiteResult | None:
+        """Return a screening result by analysis run id, or None."""
+        ...

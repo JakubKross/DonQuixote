@@ -35,6 +35,11 @@ pywake = [
 pvlib = [
     "pvlib>=0.11",
 ]
+web = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
+]
 
 
 [tool.setuptools.packages.find]
@@ -51,6 +56,7 @@ addopts = [
 markers = [
     "pywake: integration tests requiring the optional PyWake dependency",
     "pvlib: integration tests requiring the optional pvlib dependency",
+    "web: integration tests requiring the optional FastAPI/web dependency",
 ]
 
 
