@@ -1,9 +1,24 @@
 geopandas>=1.0
 pyproj>=3.5
 shapely>=2.0
+PyYAML>=6.0
 
 [dev]
 pytest
 pytest-cov
 ruff
 mypy
+
+[pvlib]
+pvlib>=0.11
+
+[pywake]
+py-wake>=2.6
+
+[streamlit]
+streamlit>=1.38
+
+[web]
+fastapi>=0.110
+uvicorn>=0.29
+python-multipart>=0.0.9

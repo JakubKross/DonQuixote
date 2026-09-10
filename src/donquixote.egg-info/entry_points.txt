@@ -1,2 +1,3 @@
 [console_scripts]
 donquixote = renewable_planner.cli:main
+renewable-planner = renewable_planner.cli:main
