@@ -2,11 +2,33 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from renewable_planner import __version__
 from renewable_planner.cli import main
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def _screen_site_args(output: Path, **extra: str) -> list[str]:
+    arguments = [
+        "screen-site",
+        "--site",
+        str(FIXTURES / "cli_site.geojson"),
+        "--constraints",
+        str(FIXTURES / "cli_constraints.geojson"),
+        "--rules",
+        str(FIXTURES / "cli_rules.yaml"),
+        "--technology",
+        "wind",
+        "--analysis-date",
+        "2026-08-17",
+        "--output",
+        str(output),
+    ]
+    for name, value in extra.items():
+        arguments.extend([f"--{name.replace('_', '-')}", value])
+    return arguments
 
 
 def test_cli_displays_version(capsys: pytest.CaptureFixture[str]) -> None:
@@ -22,26 +44,7 @@ def test_cli_screen_site_writes_summary_and_spatial_outputs(
 ) -> None:
     output = tmp_path / "screening"
 
-    assert (
-        main(
-            [
-                "screen-site",
-                "--site",
-                str(FIXTURES / "cli_site.geojson"),
-                "--constraints",
-                str(FIXTURES / "cli_constraints.geojson"),
-                "--rules",
-                str(FIXTURES / "cli_rules.yaml"),
-                "--technology",
-                "wind",
-                "--analysis-date",
-                "2026-08-17",
-                "--output",
-                str(output),
-            ]
-        )
-        == 0
-    )
+    assert main(_screen_site_args(output)) == 0
 
     summary = capsys.readouterr().out
     assert "Powierzchnia początkowa: 400.00 m²" in summary
@@ -76,11 +79,257 @@ def test_cli_screen_site_writes_summary_and_spatial_outputs(
         "Powierzchnia początkowa:",
         "Powierzchnia wykluczona:",
         "Powierzchnia dostępna:",
+        "PRODUKCJA ENERGII (WIATR)",
+        "PRODUKCJA ENERGII (PV)",
+        "AGREGACJA HYBRYDOWA I PRZYŁĄCZE",
+        "MAGAZYN ENERGII (BATERIA)",
         "OGRANICZENIA WYNIKU",
         "nie jest wiążącą opinią prawną",
         "nie gwarantuje możliwości realizacji inwestycji",
     ):
         assert section in report
+
+
+def test_cli_screen_site_places_turbines_when_catalog_is_given(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = tmp_path / "screening"
+
+    exit_code = main(
+        _screen_site_args(
+            output,
+            turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+            turbine_spacing_rotor_diameters="1",
+        )
+    )
+
+    assert exit_code == 0
+    summary = capsys.readouterr().out
+    assert "Liczba wygenerowanych pozycji turbin:" in summary
+
+    positions = json.loads((output / "turbine_positions.geojson").read_text(encoding="utf-8"))
+    assert positions["type"] == "FeatureCollection"
+    assert positions["crs"]["properties"]["name"] == "EPSG:2180"
+    assert positions["features"]
+    assert all(feature["geometry"]["type"] == "Point" for feature in positions["features"])
+
+
+def test_cli_reports_when_no_area_remains_for_turbines(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = tmp_path / "screening"
+    site = tmp_path / "site.geojson"
+    site.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": "EPSG:2180"}},
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[2, 2], [5, 2], [5, 5], [2, 5], [2, 2]]],
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "screen-site",
+            "--site",
+            str(site),
+            "--constraints",
+            str(FIXTURES / "cli_constraints.geojson"),
+            "--rules",
+            str(FIXTURES / "cli_rules.yaml"),
+            "--technology",
+            "wind",
+            "--analysis-date",
+            "2026-08-17",
+            "--output",
+            str(output),
+            "--turbine-catalog",
+            str(FIXTURES / "cli_turbine_catalog.yaml"),
+            "--turbine-spacing-rotor-diameters",
+            "1",
+        ]
+    )
+
+    assert exit_code == 0
+    assert "Brak dostępnego obszaru do rozmieszczenia turbin." in capsys.readouterr().out
+    assert not (output / "turbine_positions.geojson").exists()
+
+
+def test_cli_rejects_turbine_options_without_catalog(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                turbine_spacing_rotor_diameters="1",
+            )
+        )
+
+    assert exit_info.value.code == 2
+
+
+def test_cli_rejects_catalog_without_spacing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+            )
+        )
+
+    assert "--turbine-spacing-rotor-diameters is required" in capsys.readouterr().err
+
+
+def test_cli_rejects_manufacturer_without_model(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+                turbine_spacing_rotor_diameters="1",
+                turbine_manufacturer="Fikcyjny Wind",
+            )
+        )
+
+    assert "must be used together" in capsys.readouterr().err
+
+
+def test_cli_rejects_ambiguous_catalog_without_selection(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    catalog = tmp_path / "catalog.yaml"
+    turbine = {
+        "manufacturer": "Fikcyjny Wind",
+        "model_name": "FW-Test",
+        "rated_power_kw": 100,
+        "rotor_diameter_m": 2,
+        "hub_height_m": 10,
+        "cut_in_wind_speed_mps": 3,
+        "rated_wind_speed_mps": 10,
+        "cut_out_wind_speed_mps": 25,
+        "power_curve": [
+            {"wind_speed_mps": 3, "power_kw": 0},
+            {"wind_speed_mps": 10, "power_kw": 100},
+        ],
+        "data_source": "synthetic-test-dataset",
+        "data_version": "test-v1",
+    }
+    other = dict(turbine, model_name="FW-Test-2")
+    catalog.write_text(yaml.safe_dump({"turbines": [turbine, other]}), encoding="utf-8")
+
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                turbine_catalog=str(catalog),
+                turbine_spacing_rotor_diameters="1",
+            )
+        )
+
+    assert "more than one turbine" in capsys.readouterr().err
+
+
+def test_cli_rejects_unknown_turbine_selection(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+                turbine_spacing_rotor_diameters="1",
+                turbine_manufacturer="Nieznany",
+                turbine_model="Nieznany",
+            )
+        )
+
+    assert "turbine not found in catalog" in capsys.readouterr().err
+
+
+def test_cli_simulates_wind_production_with_the_default_no_wake_simulator(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = tmp_path / "screening"
+
+    exit_code = main(
+        _screen_site_args(
+            output,
+            turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+            turbine_spacing_rotor_diameters="1",
+            wind_resource=str(FIXTURES / "wind_resource_sample.yaml"),
+        )
+    )
+
+    assert exit_code == 0
+    summary = capsys.readouterr().out
+    assert "AEP bez uwzględnienia wake:" in summary
+    assert "AEP z uwzględnieniem wake:" in summary
+    assert "Straty wake: 0.00 MWh (0.00%)" in summary
+
+    report = (output / "report.txt").read_text(encoding="utf-8")
+    assert "AEP bez uwzględnienia wake:" in report
+    assert "Symulacji produkcji energii wiatrowej nie uruchomiono" not in report
+    assert "Symulacji produkcji energii PV nie uruchomiono" in report
+
+
+def test_cli_rejects_wind_resource_without_turbine_catalog(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                wind_resource=str(FIXTURES / "wind_resource_sample.yaml"),
+            )
+        )
+
+    assert "--wind-resource requires --turbine-catalog" in capsys.readouterr().err
+
+
+def test_cli_rejects_use_pywake_without_wind_resource(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    arguments = _screen_site_args(
+        tmp_path / "screening",
+        turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+        turbine_spacing_rotor_diameters="1",
+    )
+    arguments.append("--use-pywake")
+
+    with pytest.raises(SystemExit):
+        main(arguments)
+
+    assert "--use-pywake requires --wind-resource" in capsys.readouterr().err
+
+
+def test_cli_rejects_missing_wind_resource_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+                turbine_spacing_rotor_diameters="1",
+                wind_resource=str(tmp_path / "missing-wind.yaml"),
+            )
+        )
+
+    assert "wind-resource file does not exist" in capsys.readouterr().err
 
 
 def test_cli_rejects_missing_input_file(capsys: pytest.CaptureFixture[str]) -> None:

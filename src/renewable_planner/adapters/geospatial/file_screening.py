@@ -8,7 +8,7 @@ from uuid import UUID, uuid5
 
 import geopandas
 from shapely import union_all
-from shapely.geometry import mapping
+from shapely.geometry import Point, mapping
 from shapely.wkt import loads as load_wkt
 
 from renewable_planner.adapters.rules import (
@@ -26,6 +26,7 @@ from renewable_planner.domain import (
     SpatialConstraint,
     SpatialDataLayer,
     SpatialGeometry,
+    TurbinePosition,
 )
 from renewable_planner.ports.screening import (
     AnalysisRunRepository,
@@ -173,6 +174,31 @@ def write_screening_outputs(result: ScreenSiteResult, output_directory: Path) ->
     )
     _write_geometry(output_directory / "available_area.geojson", spatial.remaining_geometry)
     _write_geometry(output_directory / "excluded_areas.geojson", spatial.excluded_geometry)
+
+
+def write_turbine_positions(
+    positions: Sequence[TurbinePosition],
+    crs: str,
+    output_directory: Path,
+) -> None:
+    """Write generated turbine candidate positions as a GeoJSON point layer."""
+    output_directory.mkdir(parents=True, exist_ok=True)
+    features = [
+        {
+            "type": "Feature",
+            "properties": {"index": index},
+            "geometry": mapping(Point(position.x_m, position.y_m)),
+        }
+        for index, position in enumerate(positions)
+    ]
+    document = {
+        "type": "FeatureCollection",
+        "crs": {"type": "name", "properties": {"name": crs}},
+        "features": features,
+    }
+    (output_directory / "turbine_positions.geojson").write_text(
+        json.dumps(document, indent=2), encoding="utf-8"
+    )
 
 
 def _load_layers(path: Path, expected_crs: str) -> dict[str, SpatialDataLayer]:

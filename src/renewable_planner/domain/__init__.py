@@ -38,6 +38,11 @@ from renewable_planner.domain.wind_production import (
     WindProductionModel,
     WindProductionValidationError,
 )
+from renewable_planner.domain.wind_resource import (
+    WindResourceSample,
+    WindResourceTimeSeries,
+    WindResourceValidationError,
+)
 from renewable_planner.domain.wind_simulation import (
     WindSimulationRequest,
     WindSimulationResult,
@@ -86,6 +91,9 @@ __all__ = [
     "WindLayoutValidationError",
     "WindProductionModel",
     "WindProductionValidationError",
+    "WindResourceSample",
+    "WindResourceTimeSeries",
+    "WindResourceValidationError",
     "WindSimulationRequest",
     "WindSimulationResult",
     "WindSimulationValidationError",

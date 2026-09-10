@@ -1,0 +1,14 @@
+turbines:
+  - manufacturer: "Fikcyjny Wind"
+    model_name: "FW-Test"
+    rated_power_kw: 100
+    rotor_diameter_m: 2
+    hub_height_m: 10
+    cut_in_wind_speed_mps: 3
+    rated_wind_speed_mps: 10
+    cut_out_wind_speed_mps: 25
+    power_curve:
+      - {wind_speed_mps: 3, power_kw: 0}
+      - {wind_speed_mps: 10, power_kw: 100}
+    data_source: "synthetic-test-dataset"
+    data_version: "test-v1"
