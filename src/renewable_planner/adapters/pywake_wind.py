@@ -53,7 +53,11 @@ class PyWakeWindFarmSimulator:
             hub_heights=[request.turbine.hub_height_m],
             powerCtFunctions=[power_ct],
         )
-        site = UniformSite(p_wd=[1], p_ws=[1], ti=0.1)
+        # p_ws was removed from UniformSite in py-wake >= 2.6; per-timestep wind
+        # speeds are supplied directly to the model call below via `ws=ws`, so
+        # the site itself only needs a wind-direction probability and turbulence
+        # intensity.
+        site = UniformSite(p_wd=[1], ti=0.1)
         model = (
             self._model_factory(site, wind_turbines)
             if self._model_factory
