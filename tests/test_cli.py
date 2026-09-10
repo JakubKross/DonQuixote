@@ -332,6 +332,204 @@ def test_cli_rejects_missing_wind_resource_file(
     assert "wind-resource file does not exist" in capsys.readouterr().err
 
 
+def test_cli_sizes_solar_array_when_catalog_is_given(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = tmp_path / "screening"
+
+    exit_code = main(
+        _screen_site_args(
+            output,
+            solar_catalog=str(FIXTURES / "cli_solar_catalog.yaml"),
+            solar_ground_coverage_ratio="0.4",
+        )
+    )
+
+    assert exit_code == 0
+    assert "Liczba modułów PV:" in capsys.readouterr().out
+
+
+def test_cli_reports_when_no_area_remains_for_solar(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = tmp_path / "screening"
+    site = tmp_path / "site.geojson"
+    site.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": "EPSG:2180"}},
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[2, 2], [5, 2], [5, 5], [2, 5], [2, 2]]],
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "screen-site",
+            "--site",
+            str(site),
+            "--constraints",
+            str(FIXTURES / "cli_constraints.geojson"),
+            "--rules",
+            str(FIXTURES / "cli_rules.yaml"),
+            "--technology",
+            "wind",
+            "--analysis-date",
+            "2026-08-17",
+            "--output",
+            str(output),
+            "--solar-catalog",
+            str(FIXTURES / "cli_solar_catalog.yaml"),
+            "--solar-ground-coverage-ratio",
+            "0.4",
+        ]
+    )
+
+    assert exit_code == 0
+    assert "Brak dostępnego obszaru do posadowienia instalacji PV." in capsys.readouterr().out
+
+
+def test_cli_simulates_solar_production_with_the_default_lossless_simulator(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = tmp_path / "screening"
+
+    exit_code = main(
+        _screen_site_args(
+            output,
+            solar_catalog=str(FIXTURES / "cli_solar_catalog.yaml"),
+            solar_ground_coverage_ratio="0.4",
+            solar_resource=str(FIXTURES / "solar_resource_sample.yaml"),
+        )
+    )
+
+    assert exit_code == 0
+    summary = capsys.readouterr().out
+    assert "AEP DC (przed inwerterem):" in summary
+    assert "AEP AC (po inwerterze):" in summary
+    assert "Straty inwertera: 0.00 MWh (0.00%)" in summary
+
+    report = (output / "report.txt").read_text(encoding="utf-8")
+    assert "AEP DC (przed inwerterem):" in report
+    assert "Symulacji produkcji energii PV nie uruchomiono" not in report
+
+
+def test_cli_rejects_solar_options_without_catalog(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                solar_ground_coverage_ratio="0.4",
+            )
+        )
+
+    assert exit_info.value.code == 2
+
+
+def test_cli_rejects_catalog_without_ground_coverage_ratio(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                solar_catalog=str(FIXTURES / "cli_solar_catalog.yaml"),
+            )
+        )
+
+    assert "--solar-ground-coverage-ratio is required" in capsys.readouterr().err
+
+
+def test_cli_rejects_solar_manufacturer_without_model(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                solar_catalog=str(FIXTURES / "cli_solar_catalog.yaml"),
+                solar_ground_coverage_ratio="0.4",
+                solar_manufacturer="Fikcyjny Solar",
+            )
+        )
+
+    assert "must be used together" in capsys.readouterr().err
+
+
+def test_cli_rejects_unknown_solar_module_selection(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                solar_catalog=str(FIXTURES / "cli_solar_catalog.yaml"),
+                solar_ground_coverage_ratio="0.4",
+                solar_manufacturer="Nieznany",
+                solar_model="Nieznany",
+            )
+        )
+
+    assert "solar module not found in catalog" in capsys.readouterr().err
+
+
+def test_cli_rejects_solar_resource_without_catalog(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                solar_resource=str(FIXTURES / "solar_resource_sample.yaml"),
+            )
+        )
+
+    assert "--solar-resource requires --solar-catalog" in capsys.readouterr().err
+
+
+def test_cli_rejects_use_pvlib_without_solar_resource(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    arguments = _screen_site_args(
+        tmp_path / "screening",
+        solar_catalog=str(FIXTURES / "cli_solar_catalog.yaml"),
+        solar_ground_coverage_ratio="0.4",
+    )
+    arguments.append("--use-pvlib")
+
+    with pytest.raises(SystemExit):
+        main(arguments)
+
+    assert "--use-pvlib requires --solar-resource" in capsys.readouterr().err
+
+
+def test_cli_rejects_missing_solar_resource_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                solar_catalog=str(FIXTURES / "cli_solar_catalog.yaml"),
+                solar_ground_coverage_ratio="0.4",
+                solar_resource=str(tmp_path / "missing-solar.yaml"),
+            )
+        )
+
+    assert "solar-resource file does not exist" in capsys.readouterr().err
+
+
 def test_cli_rejects_missing_input_file(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exit_info:
         main(

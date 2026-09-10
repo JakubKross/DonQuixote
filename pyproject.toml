@@ -32,6 +32,9 @@ dev = [
 pywake = [
     "py-wake>=2.6",
 ]
+pvlib = [
+    "pvlib>=0.11",
+]
 
 
 [tool.setuptools.packages.find]
@@ -47,6 +50,7 @@ addopts = [
 ]
 markers = [
     "pywake: integration tests requiring the optional PyWake dependency",
+    "pvlib: integration tests requiring the optional pvlib dependency",
 ]
 
 

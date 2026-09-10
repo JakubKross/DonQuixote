@@ -17,6 +17,31 @@ from renewable_planner.domain.energy_profile import EnergyProfile, EnergySample,
 from renewable_planner.domain.project import Project
 from renewable_planner.domain.scenario import Scenario
 from renewable_planner.domain.site import Site
+from renewable_planner.domain.solar_layout import (
+    GroundCoverageRatio,
+    SolarArrayLayout,
+    SolarArraySizer,
+    SolarLayoutValidationError,
+)
+from renewable_planner.domain.solar_module import (
+    SolarModule,
+    SolarModuleCatalog,
+    SolarModuleValidationError,
+)
+from renewable_planner.domain.solar_production import (
+    SolarProductionModel,
+    SolarProductionValidationError,
+)
+from renewable_planner.domain.solar_resource import (
+    SolarResourceSample,
+    SolarResourceTimeSeries,
+    SolarResourceValidationError,
+)
+from renewable_planner.domain.solar_simulation import (
+    SolarSimulationRequest,
+    SolarSimulationResult,
+    SolarSimulationValidationError,
+)
 from renewable_planner.domain.spatial_constraint import (
     ConstraintCategory,
     ConstraintLevel,
@@ -74,6 +99,21 @@ __all__ = [
     "Scenario",
     "ScreenSiteResult",
     "Site",
+    "GroundCoverageRatio",
+    "SolarArrayLayout",
+    "SolarArraySizer",
+    "SolarLayoutValidationError",
+    "SolarModule",
+    "SolarModuleCatalog",
+    "SolarModuleValidationError",
+    "SolarProductionModel",
+    "SolarProductionValidationError",
+    "SolarResourceSample",
+    "SolarResourceTimeSeries",
+    "SolarResourceValidationError",
+    "SolarSimulationRequest",
+    "SolarSimulationResult",
+    "SolarSimulationValidationError",
     "SpatialConstraint",
     "SpatialDataLayer",
     "SpatialGeometry",

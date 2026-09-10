@@ -1,0 +1,15 @@
+source: "Fikcyjna stacja pomiarowa testowa"
+version: "test-v1"
+records:
+  - timestamp: "2026-06-01T08:00:00+00:00"
+    poa_irradiance_w_per_m2: 200.0
+    ambient_temperature_c: 15.0
+  - timestamp: "2026-06-01T09:00:00+00:00"
+    poa_irradiance_w_per_m2: 500.0
+    ambient_temperature_c: 18.0
+  - timestamp: "2026-06-01T10:00:00+00:00"
+    poa_irradiance_w_per_m2: 800.0
+    ambient_temperature_c: 22.0
+  - timestamp: "2026-06-01T11:00:00+00:00"
+    poa_irradiance_w_per_m2: 950.0
+    ambient_temperature_c: 25.0

@@ -16,8 +16,18 @@ from renewable_planner.adapters.geospatial.file_screening import (
     write_screening_outputs,
     write_turbine_positions,
 )
+from renewable_planner.adapters.pvlib_solar import PvlibSolarArraySimulator, PvlibUnavailableError
 from renewable_planner.adapters.pywake_wind import PyWakeUnavailableError, PyWakeWindFarmSimulator
+from renewable_planner.adapters.simple_solar_simulator import SimpleSolarArraySimulator
 from renewable_planner.adapters.simple_wind_simulator import SimpleWindFarmSimulator
+from renewable_planner.adapters.solar_catalog import (
+    SolarModuleCatalogError,
+    load_solar_module_catalog,
+)
+from renewable_planner.adapters.solar_resource import (
+    SolarResourceFileError,
+    load_solar_resource_time_series,
+)
 from renewable_planner.adapters.wind_catalog import (
     WindTurbineCatalogError,
     load_wind_turbine_catalog,
@@ -25,6 +35,13 @@ from renewable_planner.adapters.wind_catalog import (
 from renewable_planner.adapters.wind_resource import (
     WindResourceFileError,
     load_wind_resource_time_series,
+)
+from renewable_planner.application.solar import (
+    NoAvailableAreaError as NoAvailableSolarAreaError,
+)
+from renewable_planner.application.solar import (
+    SizeSolarArray,
+    SizeSolarArrayCommand,
 )
 from renewable_planner.application.spatial import ScreenSiteCommand, ScreenSiteError
 from renewable_planner.application.wind import (
@@ -35,13 +52,19 @@ from renewable_planner.application.wind import (
 )
 from renewable_planner.composition import build_file_screen_site, build_text_report_generator
 from renewable_planner.domain import (
+    GroundCoverageRatio,
     ScreenSiteResult,
+    SolarModule,
+    SolarModuleCatalog,
+    SolarSimulationRequest,
+    SolarSimulationResult,
     TurbinePosition,
     WindSimulationRequest,
     WindSimulationResult,
     WindTurbine,
     WindTurbineCatalog,
 )
+from renewable_planner.ports.solar import SolarArraySimulator
 from renewable_planner.ports.wind import WindFarmSimulator
 
 
@@ -84,6 +107,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     screen_site.add_argument("--technical-availability", type=float, default=1.0)
     screen_site.add_argument("--loss-factor", type=float, default=0.0)
+    screen_site.add_argument(
+        "--solar-catalog",
+        type=Path,
+        help="optional PV-module catalogue (YAML/JSON) to size an array on the result",
+    )
+    screen_site.add_argument("--solar-manufacturer")
+    screen_site.add_argument("--solar-model")
+    screen_site.add_argument("--solar-ground-coverage-ratio", type=float)
+    screen_site.add_argument(
+        "--solar-resource",
+        type=Path,
+        help="optional hourly solar-resource series (YAML/JSON) to simulate energy production",
+    )
+    screen_site.add_argument(
+        "--use-pvlib",
+        action="store_true",
+        help="convert DC to AC with the optional pvlib PVWatts inverter model instead of "
+        "the built-in lossless-inverter simulator",
+    )
+    screen_site.add_argument("--solar-technical-availability", type=float, default=1.0)
+    screen_site.add_argument("--solar-loss-factor", type=float, default=0.0)
     return parser
 
 
@@ -121,6 +165,8 @@ def _run_screen_site(arguments: argparse.Namespace) -> None:
         raise FileScreeningError("technology must not be empty")
     _validate_turbine_arguments(arguments)
     _validate_wind_simulation_arguments(arguments)
+    _validate_solar_arguments(arguments)
+    _validate_solar_simulation_arguments(arguments)
 
     site = load_site(arguments.site)
     use_case, project = build_file_screen_site(
@@ -153,6 +199,16 @@ def _run_screen_site(arguments: argparse.Namespace) -> None:
         positions = _place_turbines(arguments, result, site.boundary.crs, turbine)
         if positions and arguments.wind_resource is not None:
             wind_simulation_result = _simulate_wind_production(arguments, turbine, positions)
+
+    solar_simulation_result: SolarSimulationResult | None = None
+    if arguments.solar_catalog is not None:
+        solar_catalog = _load_solar_catalog(arguments.solar_catalog)
+        module = _select_solar_module(
+            solar_catalog, arguments.solar_manufacturer, arguments.solar_model
+        )
+        module_count = _size_solar_array(arguments, result, module)
+        if module_count > 0 and arguments.solar_resource is not None:
+            solar_simulation_result = _simulate_solar_production(arguments, module, module_count)
 
     report = build_text_report_generator().execute(project, result)
     (arguments.output / "report.txt").write_text(report, encoding="utf-8")
@@ -273,4 +329,120 @@ def _simulate_wind_production(
     print(f"AEP bez uwzględnienia wake: {result.no_wake_profile.total_energy_mwh:.2f} MWh")
     print(f"AEP z uwzględnieniem wake: {result.wake_profile.total_energy_mwh:.2f} MWh")
     print(f"Straty wake: {result.wake_loss_mwh:.2f} MWh ({result.wake_loss_fraction * 100:.2f}%)")
+    return result
+
+
+def _validate_solar_arguments(arguments: argparse.Namespace) -> None:
+    solar_options = (
+        arguments.solar_manufacturer,
+        arguments.solar_model,
+        arguments.solar_ground_coverage_ratio,
+    )
+    if arguments.solar_catalog is None:
+        if any(option is not None for option in solar_options):
+            raise FileScreeningError("solar options require --solar-catalog")
+        return
+    if not arguments.solar_catalog.is_file():
+        raise FileScreeningError(f"solar-catalog file does not exist: {arguments.solar_catalog}")
+    if arguments.solar_ground_coverage_ratio is None:
+        raise FileScreeningError("--solar-ground-coverage-ratio is required with --solar-catalog")
+    if bool(arguments.solar_manufacturer) != bool(arguments.solar_model):
+        raise FileScreeningError("--solar-manufacturer and --solar-model must be used together")
+
+def _validate_solar_simulation_arguments(arguments: argparse.Namespace) -> None:
+    if arguments.solar_resource is None:
+        if arguments.use_pvlib:
+            raise FileScreeningError("--use-pvlib requires --solar-resource")
+        return
+    if arguments.solar_catalog is None:
+        raise FileScreeningError("--solar-resource requires --solar-catalog")
+    if not arguments.solar_resource.is_file():
+        raise FileScreeningError(f"solar-resource file does not exist: {arguments.solar_resource}")
+
+def _load_solar_catalog(path: Path) -> SolarModuleCatalog:
+    try:
+        return load_solar_module_catalog(path)
+    except SolarModuleCatalogError as error:
+        raise FileScreeningError(str(error)) from error
+
+def _select_solar_module(
+    catalog: SolarModuleCatalog,
+    manufacturer: str | None,
+    model_name: str | None,
+) -> SolarModule:
+    if manufacturer and model_name:
+        module = catalog.find(manufacturer, model_name)
+        if module is None:
+            raise FileScreeningError(
+                f"solar module not found in catalog: {manufacturer} {model_name}"
+            )
+        return module
+    if len(catalog.modules) != 1:
+        raise FileScreeningError(
+            "--solar-manufacturer and --solar-model are required when the "
+            "catalog contains more than one module"
+        )
+    return catalog.modules[0]
+
+def _size_solar_array(
+    arguments: argparse.Namespace,
+    result: ScreenSiteResult,
+    module: SolarModule,
+) -> int:
+    """Size a PV array on the screening's available area and report it."""
+    use_case = SizeSolarArray()
+    command = SizeSolarArrayCommand(
+        screening_result=result,
+        module=module,
+        ground_coverage_ratio=GroundCoverageRatio(arguments.solar_ground_coverage_ratio),
+    )
+    try:
+        layout = use_case.execute(command)
+    except NoAvailableSolarAreaError:
+        print("Brak dostępnego obszaru do posadowienia instalacji PV.")
+        return 0
+    print(
+        f"Liczba modułów PV: {layout.module_count} "
+        f"(moc zainstalowana: {layout.installed_capacity_w / 1000:.2f} kWp)"
+    )
+    return layout.module_count
+
+def _simulate_solar_production(
+    arguments: argparse.Namespace,
+    module: SolarModule,
+    module_count: int,
+) -> SolarSimulationResult:
+    """Simulate hourly energy production for the sized PV array.
+
+    Uses the built-in, dependency-free simulator by default; ``--use-pvlib``
+    switches to the optional pvlib PVWatts inverter model.
+    """
+    try:
+        series = load_solar_resource_time_series(arguments.solar_resource)
+    except SolarResourceFileError as error:
+        raise FileScreeningError(str(error)) from error
+
+    request = SolarSimulationRequest(
+        module=module,
+        module_count=module_count,
+        timestamps=series.timestamps,
+        poa_irradiance_w_per_m2=series.poa_irradiance_w_per_m2,
+        ambient_temperature_c=series.ambient_temperature_c,
+        technical_availability=arguments.solar_technical_availability,
+        loss_factor=arguments.solar_loss_factor,
+    )
+    simulator: SolarArraySimulator = (
+        PvlibSolarArraySimulator() if arguments.use_pvlib else SimpleSolarArraySimulator()
+    )
+    try:
+        result = simulator.simulate(request)
+    except PvlibUnavailableError as error:
+        raise FileScreeningError(str(error)) from error
+
+    print(f"AEP DC (przed inwerterem): {result.dc_profile.total_energy_mwh:.2f} MWh")
+    print(f"AEP AC (po inwerterze): {result.ac_profile.total_energy_mwh:.2f} MWh")
+    print(
+        f"Straty inwertera: {result.inverter_loss_mwh:.2f} MWh "
+        f"({result.inverter_loss_fraction * 100:.2f}%)"
+    )
     return result

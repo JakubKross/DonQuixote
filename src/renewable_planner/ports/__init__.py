@@ -10,6 +10,7 @@ from renewable_planner.ports.screening import (
     SpatialRuleEvaluator,
     SpatialRuleProvider,
 )
+from renewable_planner.ports.solar import SolarArraySimulator, SolarResourceProvider
 from renewable_planner.ports.spatial import (
     ConstraintLayerProvider,
     CoordinateReferenceSystemService,
@@ -35,6 +36,8 @@ __all__ = [
     "SiteRepository",
     "SiteBoundaryProvider",
     "SiteScreeningResultRepository",
+    "SolarArraySimulator",
+    "SolarResourceProvider",
     "SpatialDataLayerProvider",
     "SpatialOperations",
     "SpatialRuleEvaluator",

@@ -1,0 +1,9 @@
+modules:
+  - manufacturer: "Fikcyjny Solar"
+    model_name: "FS-400"
+    rated_power_w: 400
+    width_m: 1.0
+    height_m: 1.7
+    temperature_coefficient_pct_per_c: -0.35
+    data_source: "synthetic-test-dataset"
+    data_version: "test-v1"
