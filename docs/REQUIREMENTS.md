@@ -3,7 +3,9 @@
 ## Cel
 
 DonQuixote jest narzędziem wspomagającym wstępne planowanie instalacji OZE
-w Polsce. Pierwsza wersja koncentruje się na lądowych farmach wiatrowych.
+w Polsce. Pierwsza wersja koncentrowała się na lądowych farmach wiatrowych;
+obecna obejmuje też fotowoltaikę, magazyny energii i projekty hybrydowe
+wiatr + PV + magazyn (patrz „Zaimplementowane moduły technologiczne” niżej).
 Wyniki mają wspierać dalszą analizę lokalizacyjną, ale nie zastępują opinii
 prawnej, decyzji administracyjnej ani bankowalnej prognozy produkcji.
 
@@ -30,32 +32,79 @@ System musi:
 - generować wynikowe warstwy GeoJSON i raport tekstowy ze źródłami danych;
 - wskazywać elementy wymagające weryfikacji eksperta.
 
-### Katalog turbin — pierwszy zakres modułu `wind`
+### Moduł `wind` — katalog turbin, dane wiatrowe i produkcja
 
 System musi:
 
-- przechowywać producenta i nazwę modelu turbiny;
-- przechowywać moc znamionową w kW, średnicę wirnika i wysokość piasty w m;
-- przechowywać prędkości załączenia, znamionową i wyłączenia w m/s;
-- przechowywać uporządkowaną, uproszczoną krzywą mocy w punktach m/s–kW;
-- przechowywać źródło i wersję danych;
-- walidować jednostki wynikające z nazw pól oraz zakresy i skończoność wartości;
-- odczytywać katalog z YAML lub JSON;
-- nie wymagać PyWake do utworzenia ani odczytu modelu turbiny.
+- przechowywać producenta i nazwę modelu turbiny, moc znamionową w kW,
+  średnicę wirnika, wysokość piasty w m, prędkości załączenia, znamionową i
+  wyłączenia w m/s, uporządkowaną uproszczoną krzywą mocy w punktach m/s–kW
+  oraz źródło i wersję danych;
+- walidować jednostki wynikające z nazw pól oraz zakresy i skończoność
+  wartości;
+- odczytywać katalog turbin z YAML lub JSON i nie wymagać PyWake do
+  utworzenia ani odczytu modelu turbiny;
+- wczytywać godzinowy szereg czasowy zasobu wiatrowego (prędkość, kierunek)
+  z pliku;
+- generować rozmieszczenie turbin na dostępnym obszarze po screeningu, z
+  zachowaniem minimalnych odstępów;
+- symulować godzinowy profil produkcji wbudowanym, uproszczonym symulatorem
+  (bez modelu wake) domyślnie;
+- opcjonalnie (extra `pywake`) symulować produkcję adapterem PyWake z
+  modelem wake, zwracać AEP z i bez uwzględnienia wake oraz raportować
+  straty wake.
 
-### Interfejs i uruchamianie
+### Moduł `solar` — katalog PV, zasób i produkcja
 
-Obecna wersja musi udostępniać przypadek użycia screeningu przez CLI
-`screen-site` z wymaganymi argumentami:
+System musi:
 
-- `--site` — granica obszaru;
-- `--constraints` — warstwy ograniczeń;
-- `--rules` — konfiguracja reguł;
-- `--technology` — analizowana technologia;
-- `--output` — katalog wynikowy.
+- przechowywać dane modułu PV (moc, sprawność, źródło i wersję danych) w
+  katalogu YAML/JSON;
+- dobrać wielkość instalacji PV na dostępnym obszarze po screeningu na
+  podstawie zadanego współczynnika pokrycia terenu (ground coverage ratio);
+- wczytywać godzinowy szereg czasowy zasobu nasłonecznienia (napromieniowanie
+  w płaszczyźnie modułów, temperatura otoczenia) z pliku;
+- symulować godzinową produkcję DC/AC wbudowanym, uproszczonym symulatorem
+  domyślnie;
+- opcjonalnie (extra `pvlib`) symulować produkcję adapterem pvlib z modelem
+  inwertera PVWatts.
 
-Data analizy i kraj powinny być konfigurowalne. Domyślnym krajem jest Polska,
-a brak daty oznacza bieżącą datę.
+### Moduły `grid` i `hybrid` — przyłącze i agregacja
+
+System musi:
+
+- przyjmować limit mocy wspólnego przyłączenia;
+- agregować profile produkcji wiatru i PV w jeden profil energii;
+- ograniczać (curtailment) zagregowaną produkcję do limitu przyłącza i
+  raportować wykorzystanie przyłącza oraz wielkość i udział curtailmentu.
+
+### Moduł `storage` — magazyn energii
+
+System musi:
+
+- przechowywać dane baterii (pojemność, moc, sprawność ładowania/
+  rozładowania, minimalny/maksymalny stan naładowania, źródło i wersję
+  danych) w katalogu YAML/JSON;
+- wyznaczać dyspozycję (dispatch) baterii względem zagregowanego profilu
+  wiatr+PV i limitu przyłącza: ładowanie nadwyżką, rozładowanie zgodnie z
+  ograniczeniami mocy i pojemności;
+- uwzględniać straty magazynu (round-trip) i raportować końcowy stan
+  naładowania oraz curtailment po wsparciu magazynu.
+
+### Interfejsy
+
+**CLI** udostępnia przypadek użycia screeningu poleceniem `screen-site` z
+wymaganymi argumentami `--site`, `--constraints`, `--rules`, `--technology`,
+`--output`; data analizy i kraj są konfigurowalne (domyślny kraj to Polska,
+brak daty oznacza bieżącą datę). Symulacje wiatru/PV, agregacja hybrydowa i
+magazyn są opcjonalne i włączane dodatkowymi flagami (pełna lista:
+`donquixote screen-site --help`).
+
+**Web (opcjonalnie, extra `web`/`streamlit`)** — proste API FastAPI
+(`src/renewable_planner/api/`) i formularz Streamlit wywołują te same
+przypadki użycia co CLI przez wspólny `composition`. Zakres i status
+poszczególnych kroków wersji webowej (PostGIS, worker, frontend
+React/MapLibre) opisuje [WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md).
 
 ## Wymagania niefunkcjonalne
 
@@ -84,57 +133,32 @@ System powinien również:
 
 ## Poza zakresem obecnej wersji
 
-Poniższe funkcje nie są wymagane do ukończenia obecnego etapu screeningu:
+Poniższe funkcje nie są jeszcze zaimplementowane:
 
-- automatyczne pobieranie urzędowych danych przestrzennych;
-- interfejs mapowy, Streamlit, FastAPI, frontend webowy i PostGIS;
-- rozmieszczanie turbin;
-- dane wiatrowe i godzinowy profil produkcji;
-- model wake i integracja z PyWake;
-- moduły fotowoltaiki, magazynu energii, sieci i hybrydy;
+- automatyczne pobieranie urzędowych danych przestrzennych i ocena ich
+  kompletności dla danej lokalizacji;
+- trwałe repozytoria danych (PostGIS) — API webowe i Streamlit korzystają
+  obecnie z adapterów plikowych i repozytoriów w pamięci, które nie
+  przetrwają restartu procesu;
+- procesy robocze (worker) dla długich analiz uruchamianych przez API;
+- realny interfejs mapowy z podkładem geograficznym (frontend
+  React + MapLibre) — Streamlit ma na razie schematyczny podgląd SVG bez
+  georeferencji;
+- porównywanie scenariuszy hybrydowych obok siebie;
 - końcowa kwalifikacja prawna, środowiskowa, planistyczna lub przyłączeniowa.
 
-## Planowane rozszerzenia
+Szczegółowy status wersji webowej (kroki 1–5) opisuje
+[WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md#9-status-implementacji), a
+kolejność etapów i zakres prac — [ROADMAP.md](ROADMAP.md).
 
-Rozszerzenia muszą pozostać niezależnymi modułami technologicznymi i wymieniać
-wyniki przez wspólne modele domenowe. Ich planowany zakres to:
+## Zaimplementowane moduły technologiczne
 
-### Wind
-
-- podstawowy katalog turbin jest pierwszym zaimplementowanym zakresem tego
-  modułu;
-- źródło danych wiatrowych;
-- uproszczony godzinowy profil produkcji;
-- rozmieszczanie turbin i minimalne odstępy;
-- później adapter PyWake, AEP, profil po uwzględnieniu wake i raportowanie strat.
-
-### Solar
-
-- dane nasłonecznienia;
-- adapter pvlib;
-- rozmieszczanie instalacji PV;
-- godzinowa produkcja energii.
-
-### Storage
-
-- model baterii i stan naładowania;
-- ładowanie nadwyżką;
-- rozładowanie zgodnie z ograniczeniami;
-- uwzględnienie strat.
-
-### Grid
-
-- model wspólnego przyłączenia;
-- limit przyłączenia;
-- wykorzystanie przyłącza i ograniczenia eksportu.
-
-### Hybrid
-
-- agregacja wyników wind, solar i storage;
-- curtailment przy ograniczonym przyłączu;
-- porównywanie scenariuszy hybrydowych wiatr + PV + magazyn.
-
-Kolejność etapów i zakres prac szczegółowych określa [ROADMAP.md](ROADMAP.md).
+Moduły `wind`, `solar`, `storage`, `grid` i `hybrid` pozostają niezależne i
+wymieniają wyniki przez wspólny model `EnergyProfile` — ich szczegółowy
+zakres opisują sekcje wyżej („Moduł `wind`…”, „Moduł `solar`…”, „Moduły
+`grid` i `hybrid`…”, „Moduł `storage`…”). Kolejność, w jakiej powstały, i
+zakres pozostałych prac (przede wszystkim Etap 8 — wersja webowa) opisuje
+[ROADMAP.md](ROADMAP.md).
 
 ## Pochodzenie i wersjonowanie danych
 
@@ -153,17 +177,25 @@ Kolejność etapów i zakres prac szczegółowych określa [ROADMAP.md](ROADMAP.
 
 ## Ograniczenia obecnego MVP
 
-Obecne MVP:
+Obecna wersja:
 
-- korzysta wyłącznie z dostarczonych plików GeoJSON i YAML;
-- nie pobiera automatycznie danych i nie ocenia, czy zewnętrzne warstwy są
-  kompletne dla danej lokalizacji;
+- korzysta wyłącznie z dostarczonych plików GeoJSON i YAML — nie pobiera
+  automatycznie danych i nie ocenia, czy zewnętrzne warstwy są kompletne dla
+  danej lokalizacji;
 - nie wykonuje końcowej kwalifikacji prawnej, środowiskowej, planistycznej,
   technicznej ani przyłączeniowej;
-- udostępnia tylko interfejs CLI, bez mapy i interfejsu webowego;
-- nie zawiera katalogu turbin, danych wiatrowych, produkcji energii,
-  rozmieszczania turbin ani modelu wake;
-- nie zawiera jeszcze modułów solar, storage, grid ani hybrid.
+- zakłada jeden, stały szereg czasowy zasobu wiatru/nasłonecznienia dla
+  całego obszaru (brak przestrzennego zróżnicowania zasobu w obrębie farmy);
+- używa katalogów turbin/PV/baterii zawierających wyłącznie dane dostarczone
+  w konfiguracji — brak urzędowego katalogu producentów;
+- bez zainstalowanych opcjonalnych extrasów (`pywake`, `pvlib`) używa
+  wbudowanych, uproszczonych symulatorów — bez modelu wake i bez modelu
+  inwertera PVWatts;
+- API webowe i repozytoria w pamięci to jawny, wczesny krok (Krok 1 w
+  [WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md)) — stan nie przetrwa restartu
+  procesu i nie jest współdzielony między procesami roboczymi;
+- nie ma jeszcze realnego interfejsu mapowego (React/MapLibre) — dostępne są
+  CLI, proste API i formularz Streamlit ze schematycznym podglądem SVG.
 
 Wynik screeningu jest materiałem pomocniczym. Nie stanowi wiążącej opinii
 prawnej, decyzji administracyjnej, gwarancji możliwości realizacji inwestycji
