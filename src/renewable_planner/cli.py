@@ -36,6 +36,10 @@ from renewable_planner.adapters.wind_resource import (
     WindResourceFileError,
     load_wind_resource_time_series,
 )
+from renewable_planner.application.hybrid import (
+    AggregateHybridProduction,
+    AggregateHybridProductionCommand,
+)
 from renewable_planner.application.solar import (
     NoAvailableAreaError as NoAvailableSolarAreaError,
 )
@@ -52,7 +56,10 @@ from renewable_planner.application.wind import (
 )
 from renewable_planner.composition import build_file_screen_site, build_text_report_generator
 from renewable_planner.domain import (
+    EnergyProfile,
+    GridConnectionLimit,
     GroundCoverageRatio,
+    HybridProductionResult,
     ScreenSiteResult,
     SolarModule,
     SolarModuleCatalog,
@@ -128,6 +135,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     screen_site.add_argument("--solar-technical-availability", type=float, default=1.0)
     screen_site.add_argument("--solar-loss-factor", type=float, default=0.0)
+    screen_site.add_argument(
+        "--grid-connection-limit-mw",
+        type=float,
+        help="optional grid connection export limit (MW); combines and curtails "
+        "whichever wind/solar production simulations were run",
+    )
     return parser
 
 
@@ -167,6 +180,7 @@ def _run_screen_site(arguments: argparse.Namespace) -> None:
     _validate_wind_simulation_arguments(arguments)
     _validate_solar_arguments(arguments)
     _validate_solar_simulation_arguments(arguments)
+    _validate_hybrid_arguments(arguments)
 
     site = load_site(arguments.site)
     use_case, project = build_file_screen_site(
@@ -209,6 +223,12 @@ def _run_screen_site(arguments: argparse.Namespace) -> None:
         module_count = _size_solar_array(arguments, result, module)
         if module_count > 0 and arguments.solar_resource is not None:
             solar_simulation_result = _simulate_solar_production(arguments, module, module_count)
+
+    hybrid_result: HybridProductionResult | None = None
+    if arguments.grid_connection_limit_mw is not None:
+        hybrid_result = _aggregate_hybrid_production(
+            arguments, wind_simulation_result, solar_simulation_result
+        )
 
     report = build_text_report_generator().execute(project, result)
     (arguments.output / "report.txt").write_text(report, encoding="utf-8")
@@ -445,4 +465,61 @@ def _simulate_solar_production(
         f"Straty inwertera: {result.inverter_loss_mwh:.2f} MWh "
         f"({result.inverter_loss_fraction * 100:.2f}%)"
     )
+    return result
+
+
+def _validate_hybrid_arguments(arguments: argparse.Namespace) -> None:
+    if arguments.grid_connection_limit_mw is None:
+        return
+    if arguments.grid_connection_limit_mw <= 0:
+        raise FileScreeningError("--grid-connection-limit-mw must be greater than zero")
+    if arguments.wind_resource is None and arguments.solar_resource is None:
+        raise FileScreeningError(
+            "--grid-connection-limit-mw requires --wind-resource and/or --solar-resource"
+        )
+
+def _aggregate_hybrid_production(
+    arguments: argparse.Namespace,
+    wind_simulation_result: WindSimulationResult | None,
+    solar_simulation_result: SolarSimulationResult | None,
+) -> HybridProductionResult | None:
+    """Combine whichever wind/solar simulations actually ran and curtail the total.
+
+    Returns ``None`` when neither simulation produced a profile (e.g. both
+    left no available area), so the report can say so explicitly instead of
+    showing a misleadingly empty aggregate.
+    """
+    profiles: list[EnergyProfile] = []
+    if wind_simulation_result is not None:
+        profiles.append(wind_simulation_result.wake_profile)
+    if solar_simulation_result is not None:
+        profiles.append(solar_simulation_result.ac_profile)
+    if not profiles:
+        print(
+            "Brak profili produkcji do agregacji hybrydowej "
+            "(żadna symulacja wiatru/PV nie została uruchomiona)."
+        )
+        return None
+
+    use_case = AggregateHybridProduction()
+    command = AggregateHybridProductionCommand(
+        profiles=tuple(profiles),
+        connection_limit=GridConnectionLimit(arguments.grid_connection_limit_mw),
+    )
+    result = use_case.execute(command)
+
+    curtailment = result.curtailment
+    print(
+        "Produkcja łączna (przed ograniczeniem przyłącza): "
+        f"{result.aggregate_profile.total_energy_mwh:.2f} MWh"
+    )
+    print(
+        "Dostarczone do sieci (po ograniczeniu przyłącza): "
+        f"{curtailment.delivered_profile.total_energy_mwh:.2f} MWh"
+    )
+    print(
+        f"Curtailment: {curtailment.curtailed_energy_mwh:.2f} MWh "
+        f"({curtailment.curtailed_energy_fraction * 100:.2f}%)"
+    )
+    print(f"Wykorzystanie przyłącza: {curtailment.utilization_fraction * 100:.2f}%")
     return result

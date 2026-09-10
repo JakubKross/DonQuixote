@@ -14,6 +14,13 @@ from renewable_planner.domain.crs import (
     normalize_crs,
 )
 from renewable_planner.domain.energy_profile import EnergyProfile, EnergySample, sum_profiles
+from renewable_planner.domain.grid_connection import (
+    CurtailmentResult,
+    GridConnectionLimit,
+    GridConnectionLimiter,
+    GridConnectionValidationError,
+)
+from renewable_planner.domain.hybrid_production import HybridProductionResult
 from renewable_planner.domain.project import Project
 from renewable_planner.domain.scenario import Scenario
 from renewable_planner.domain.site import Site
@@ -90,9 +97,14 @@ __all__ = [
     "CoordinateTransformationError",
     "CrsDefinition",
     "CrsValidationError",
+    "CurtailmentResult",
     "EnergyProfile",
     "EnergySample",
     "FindingStatus",
+    "GridConnectionLimit",
+    "GridConnectionLimiter",
+    "GridConnectionValidationError",
+    "HybridProductionResult",
     "MissingCoordinateReferenceSystemError",
     "NonMetricCoordinateReferenceSystemError",
     "Project",

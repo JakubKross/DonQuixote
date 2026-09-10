@@ -530,6 +530,141 @@ def test_cli_rejects_missing_solar_resource_file(
     assert "solar-resource file does not exist" in capsys.readouterr().err
 
 
+def test_cli_aggregates_and_curtails_wind_production_with_a_grid_limit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = tmp_path / "screening"
+
+    exit_code = main(
+        _screen_site_args(
+            output,
+            turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+            turbine_spacing_rotor_diameters="1",
+            wind_resource=str(FIXTURES / "wind_resource_sample.yaml"),
+            grid_connection_limit_mw="0.0001",
+        )
+    )
+
+    assert exit_code == 0
+    summary = capsys.readouterr().out
+    assert "Produkcja łączna (przed ograniczeniem przyłącza):" in summary
+    assert "Dostarczone do sieci (po ograniczeniu przyłącza):" in summary
+    assert "Wykorzystanie przyłącza:" in summary
+
+    report = (output / "report.txt").read_text(encoding="utf-8")
+    assert "AGREGACJA HYBRYDOWA I PRZYŁĄCZE" in report
+    assert "Agregacji hybrydowej i limitu przyłącza nie uruchomiono" not in report
+
+
+def test_cli_reports_when_no_simulation_ran_for_hybrid_aggregation(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = tmp_path / "screening"
+    site = tmp_path / "site.geojson"
+    site.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": "EPSG:2180"}},
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[2, 2], [5, 2], [5, 5], [2, 5], [2, 2]]],
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "screen-site",
+            "--site",
+            str(site),
+            "--constraints",
+            str(FIXTURES / "cli_constraints.geojson"),
+            "--rules",
+            str(FIXTURES / "cli_rules.yaml"),
+            "--technology",
+            "wind",
+            "--analysis-date",
+            "2026-08-17",
+            "--output",
+            str(output),
+            "--turbine-catalog",
+            str(FIXTURES / "cli_turbine_catalog.yaml"),
+            "--turbine-spacing-rotor-diameters",
+            "1",
+            "--wind-resource",
+            str(FIXTURES / "wind_resource_sample.yaml"),
+            "--grid-connection-limit-mw",
+            "1",
+        ]
+    )
+
+    assert exit_code == 0
+    assert "Brak profili produkcji do agregacji hybrydowej" in capsys.readouterr().out
+
+
+def test_cli_rejects_mismatched_wind_and_solar_resource_timestamps(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+                turbine_spacing_rotor_diameters="1",
+                wind_resource=str(FIXTURES / "wind_resource_sample.yaml"),
+                solar_catalog=str(FIXTURES / "cli_solar_catalog.yaml"),
+                solar_ground_coverage_ratio="0.4",
+                solar_resource=str(FIXTURES / "solar_resource_sample.yaml"),
+                grid_connection_limit_mw="1",
+            )
+        )
+
+    assert "same timestamps" in capsys.readouterr().err
+
+
+def test_cli_rejects_non_positive_grid_connection_limit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                turbine_catalog=str(FIXTURES / "cli_turbine_catalog.yaml"),
+                turbine_spacing_rotor_diameters="1",
+                wind_resource=str(FIXTURES / "wind_resource_sample.yaml"),
+                grid_connection_limit_mw="0",
+            )
+        )
+
+    assert "--grid-connection-limit-mw must be greater than zero" in capsys.readouterr().err
+
+
+def test_cli_rejects_grid_connection_limit_without_any_resource(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            _screen_site_args(
+                tmp_path / "screening",
+                grid_connection_limit_mw="1",
+            )
+        )
+
+    assert (
+        "--grid-connection-limit-mw requires --wind-resource and/or --solar-resource"
+        in capsys.readouterr().err
+    )
+
+
 def test_cli_rejects_missing_input_file(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exit_info:
         main(
