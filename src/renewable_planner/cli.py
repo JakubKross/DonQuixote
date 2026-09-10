@@ -6,30 +6,13 @@ from datetime import date
 from pathlib import Path
 
 from renewable_planner import __version__
-from renewable_planner.adapters.geospatial import (
-    GeoPandasSpatialOperations,
-    PyprojCoordinateReferenceSystemService,
-)
 from renewable_planner.adapters.geospatial.file_screening import (
-    FileProjectRepository,
     FileScreeningError,
-    FileSiteRepository,
-    GeoJsonConstraintLayerProvider,
-    JsonResultRepository,
-    MemoryAnalysisRunRepository,
-    YamlSpatialRuleProvider,
-    build_project,
     load_site,
     write_screening_outputs,
 )
-from renewable_planner.adapters.reporting import TextAnalysisReportGenerator
-from renewable_planner.application.reporting import GenerateAnalysisReport
-from renewable_planner.application.spatial import (
-    ScreenSite,
-    ScreenSiteCommand,
-    ScreenSiteError,
-    SpatialRuleEngine,
-)
+from renewable_planner.application.spatial import ScreenSiteCommand, ScreenSiteError
+from renewable_planner.composition import build_file_screen_site, build_text_report_generator
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -80,19 +63,8 @@ def _run_screen_site(arguments: argparse.Namespace) -> None:
         raise FileScreeningError("technology must not be empty")
 
     site = load_site(arguments.site)
-    project = build_project(site, arguments.site)
-    runs = MemoryAnalysisRunRepository()
-    results = JsonResultRepository()
-    use_case = ScreenSite(
-        project_repository=FileProjectRepository(project),
-        site_repository=FileSiteRepository(site),
-        rule_provider=YamlSpatialRuleProvider(arguments.rules),
-        layer_provider=GeoJsonConstraintLayerProvider(arguments.constraints, site.boundary.crs),
-        rule_evaluator=SpatialRuleEngine(
-            GeoPandasSpatialOperations(PyprojCoordinateReferenceSystemService())
-        ),
-        analysis_run_repository=runs,
-        result_repository=results,
+    use_case, project = build_file_screen_site(
+        site, arguments.site, arguments.constraints, arguments.rules
     )
     result = use_case.execute(
         ScreenSiteCommand(
@@ -104,7 +76,7 @@ def _run_screen_site(arguments: argparse.Namespace) -> None:
         )
     )
     write_screening_outputs(result, arguments.output)
-    report = GenerateAnalysisReport(TextAnalysisReportGenerator()).execute(project, result)
+    report = build_text_report_generator().execute(project, result)
     (arguments.output / "report.txt").write_text(report, encoding="utf-8")
     spatial = result.spatial_result
     warnings = sum(
