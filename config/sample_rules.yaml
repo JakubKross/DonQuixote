@@ -1,0 +1,21 @@
+rules:
+  - id: 30000000-0000-0000-0000-000000000001
+    name: Odsunięcie od zabudowy
+    severity: exclusion
+    applies_to: [wind]
+    source_layer: buildings
+    operation: buffer
+    distance_m: 150
+    legal_basis: fikcyjna-regula-planistyczna-v1
+    valid_from: "2026-01-01"
+    valid_to: "2030-12-31"
+
+  - id: 30000000-0000-0000-0000-000000000002
+    name: Fikcyjny obszar środowiskowy
+    severity: warning
+    applies_to: [wind, solar]
+    source_layer: environmental-area
+    operation: intersects
+    distance_m: 0
+    legal_basis: fikcyjny-katalog-srodowiskowy-v1
+    valid_from: "2026-01-01"

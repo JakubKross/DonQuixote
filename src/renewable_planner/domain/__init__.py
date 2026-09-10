@@ -13,7 +13,7 @@ from renewable_planner.domain.crs import (
     UnrecognizedCoordinateReferenceSystemError,
     normalize_crs,
 )
-from renewable_planner.domain.energy_profile import EnergyProfile, EnergySample
+from renewable_planner.domain.energy_profile import EnergyProfile, EnergySample, sum_profiles
 from renewable_planner.domain.project import Project
 from renewable_planner.domain.scenario import Scenario
 from renewable_planner.domain.site import Site
@@ -74,6 +74,7 @@ __all__ = [
     "SpatialGeometry",
     "SpatialRuleEngineResult",
     "UnrecognizedCoordinateReferenceSystemError",
+    "sum_profiles",
     "PowerCurvePoint",
     "WindTurbine",
     "WindTurbineCatalog",

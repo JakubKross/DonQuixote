@@ -1,0 +1,19 @@
+rules:
+  - id: 20000000-0000-0000-0000-000000000001
+    name: Odsunięcie od budynku
+    severity: exclusion
+    applies_to: [wind]
+    source_layer: buildings
+    operation: buffer
+    distance_m: 1
+    legal_basis: synthetic-rules-v1
+    valid_from: "2026-01-01"
+  - id: 20000000-0000-0000-0000-000000000002
+    name: Fikcyjny obszar środowiskowy
+    severity: warning
+    applies_to: [wind]
+    source_layer: environment
+    operation: intersects
+    distance_m: 0
+    legal_basis: synthetic-rules-v1
+    valid_from: "2026-01-01"

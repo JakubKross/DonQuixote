@@ -1,5 +1,6 @@
 """Hourly energy profile model."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -38,3 +39,21 @@ class EnergyProfile:
     def total_energy_mwh(self) -> float:
         """Return energy represented by one-hour average-power samples."""
         return sum(sample.power_mw for sample in self.samples)
+
+
+def sum_profiles(profiles: Sequence[EnergyProfile], source: str) -> EnergyProfile:
+    """Aggregate multiple profiles sharing the same timestamps into one profile.
+
+    Used to combine identical-length per-turbine profiles into a farm-level
+    total, for example when summing wake-adjusted or no-wake production.
+    """
+    if not profiles:
+        raise ValueError("profiles must not be empty")
+    samples = tuple(
+        EnergySample(
+            timestamp=profiles[0].samples[index].timestamp,
+            power_mw=sum(profile.samples[index].power_mw for profile in profiles),
+        )
+        for index in range(len(profiles[0].samples))
+    )
+    return EnergyProfile(samples=samples, source=source)
