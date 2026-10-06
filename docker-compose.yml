@@ -1,0 +1,84 @@
+# Step 5 of docs/WEB_ARCHITECTURE.md — runs the whole web stack (API,
+# PostGIS, worker, frontend) with one command: `docker compose up --build`.
+#
+# DATABASE_URL has two different valid forms in this project: the Postgres
+# adapters connect directly via psycopg3 (`postgresql://...`), while Alembic
+# goes through SQLAlchemy and needs the `+psycopg` dialect suffix
+# (`postgresql+psycopg://...`, same as .github/workflows/ci.yml) — same
+# credentials, different URL scheme per consumer.
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-donquixote}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-donquixote}
+      POSTGRES_DB: ${POSTGRES_DB:-donquixote}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    build: .
+    command: alembic upgrade head
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-donquixote}:${POSTGRES_PASSWORD:-donquixote}@postgres:5432/${POSTGRES_DB:-donquixote}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # `postgres` passing its healthcheck doesn't always mean its TCP
+    # listener is immediately reachable on the compose network (observed
+    # as an occasional "connection refused" on the very first `up` against
+    # a fresh network) — a couple of retries clears that race rather than
+    # requiring a manual re-run.
+    restart: on-failure:5
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-donquixote}:${POSTGRES_PASSWORD:-donquixote}@postgres:5432/${POSTGRES_DB:-donquixote}
+      DONQUIXOTE_JOB_STORAGE: /data/jobs
+      DONQUIXOTE_FRONTEND_ORIGIN: http://localhost:5173
+    volumes:
+      - job-storage:/data/jobs
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: on-failure:5
+
+  worker:
+    build: .
+    command: python -m renewable_planner.worker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-donquixote}:${POSTGRES_PASSWORD:-donquixote}@postgres:5432/${POSTGRES_DB:-donquixote}
+      DONQUIXOTE_JOB_STORAGE: /data/jobs
+    volumes:
+      # Same path as `api` — the worker reads the files api wrote for a
+      # job from this path (see docs/WEB_ARCHITECTURE.md Krok 3/5); without
+      # a shared volume these would be two unrelated empty directories.
+      - job-storage:/data/jobs
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: on-failure:5
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # The browser's address for the API, not a docker-network hostname
+        # — Vite bakes this into the static bundle at build time.
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  job-storage:

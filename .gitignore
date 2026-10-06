@@ -3,3 +3,7 @@ __pycache__/
 .coverage
 .idea/
 output/
+.env
+
+# Prywatne notatki (propozycje nazw projektu, zachowane lokalnie z sentymentu)
+NazwyProjektu.txt
