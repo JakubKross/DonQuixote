@@ -1,0 +1,9 @@
+node_modules
+dist
+openapi.json
+.env
+*.tsbuildinfo
+vite.config.d.ts
+# Copied from node_modules/maplibre-gl/dist by the `postinstall` script —
+# see src/components/ScreeningMap.tsx for why, and frontend/README.md.
+public/maplibre-gl
