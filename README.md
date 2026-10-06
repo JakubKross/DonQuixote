@@ -16,8 +16,9 @@ dostępnym obszarze potrafi dodatkowo:
 Wszystkie kroki poza podstawowym screeningiem są opcjonalne i sterowane
 parametrami CLI — bez katalogu turbin/PV/baterii program ogranicza się do
 samego screeningu przestrzennego. Poza CLI dostępne jest też (opcjonalnie)
-proste API webowe (FastAPI) i formularz Streamlit, patrz
-[Architektura wersji webowej](docs/WEB_ARCHITECTURE.md).
+proste API webowe (FastAPI), formularz Streamlit i frontend React +
+MapLibre (`frontend/`, częściowy — patrz
+[Architektura wersji webowej](docs/WEB_ARCHITECTURE.md)).
 
 Wynik jest materiałem pomocniczym do dalszej analizy. Nie jest wiążącą opinią
 prawną, nie gwarantuje możliwości realizacji inwestycji i wymaga sprawdzenia
@@ -49,11 +50,15 @@ Bez tych extrasów program działa w pełni (screening, produkcja wiatru/PV,
 agregacja hybrydowa, magazyn, CLI) — brakujące zależności są wymagane
 wyłącznie przez konkretny opcjonalny adapter lub interfejs.
 
-### API webowe z trwałym stanem (PostGIS)
+### API webowe z trwałym stanem (PostGIS) i workerem (przetwarzanie async)
 
-Domyślnie API webowe trzyma stan w pamięci procesu (patrz „Obecne
-ograniczenia” niżej). Ustawienie zmiennej `DATABASE_URL` przełącza je na
-repozytoria PostGIS, które przetrwają restart procesu:
+Domyślnie API webowe trzyma stan w pamięci procesu i wykonuje screening
+synchronicznie w ramach requestu (patrz „Obecne ograniczenia” niżej).
+Ustawienie zmiennej `DATABASE_URL` przełącza je na repozytoria PostGIS
+(przetrwają restart procesu) **oraz** na kolejkę zadań: `POST
+/v1/screenings` tylko zakolejkowuje pracę i od razu zwraca `202`, a osobny
+proces-worker wykonuje ją w tle — klient odpytuje `GET
+/v1/screenings/{id}` aż do `completed`/`failed`:
 
 ```bash
 python -m pip install -e ".[web,postgres]"
@@ -62,8 +67,61 @@ alembic upgrade head    # zakłada schemat (wymaga rozszerzenia postgis)
 uvicorn renewable_planner.api.app:app
 ```
 
+W drugim terminalu (ten sam `DATABASE_URL`):
+
+```bash
+python -m renewable_planner.worker     # albo: donquixote-worker
+```
+
+Bez uruchomionego workera zakolejkowane screeningi zostają w stanie
+`pending` na zawsze — `GET` będzie je zwracać, ale nikt ich nie wykona.
+
 Szczegóły schematu i decyzji projektowych opisuje
 [docs/WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md#3-baza-danych-i-postgis).
+
+### Frontend (React + MapLibre)
+
+`frontend/` to niezależna aplikacja Vite + React + TypeScript wywołująca
+API webowe. Dziś obsługuje nowy screening i jego szczegóły (status z
+pollingiem, podsumowanie powierzchni, findingi, prawdziwa mapa z warstwami
+`available`/`excluded`) — historia analiz i wyniki per-technologia czekają
+na brakujące endpointy API (patrz
+[docs/WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md#9-status-implementacji)).
+Wymaga Node.js 18+. Uruchomienie:
+
+```bash
+uvicorn renewable_planner.api.app:app --reload   # backend, w jednym terminalu
+cd frontend && npm install && npm run dev         # frontend, w drugim
+```
+
+Szczegóły (regeneracja typów API z OpenAPI, build produkcyjny) opisuje
+[frontend/README.md](frontend/README.md).
+
+### Uruchomienie przez docker-compose (API + PostGIS + worker + frontend)
+
+Całość (bez ręcznego ustawiania `DATABASE_URL`/`VITE_API_BASE_URL`,
+instalowania Pythona czy Node.js) jednym poleceniem:
+
+```bash
+docker compose up --build
+```
+
+Uruchamia PostGIS, stosuje migracje (usługa `migrate`, jednorazowa), potem
+API (`http://localhost:8000`), worker i frontend
+(`http://localhost:5173`) — API działa od razu w trybie asynchronicznym
+(`202` + kolejka, Krok 3), bo `DATABASE_URL` jest ustawione. Domyślne dane
+logowania do Postgresa (`donquixote`/`donquixote`) są tylko do lokalnego
+dewelopmentu — skopiuj `.env.example` do `.env`, żeby je nadpisać. Zatrzymanie
+i sprzątnięcie (w tym wolumenów z danymi):
+
+```bash
+docker compose down -v
+```
+
+Szczegóły (dlaczego `api`/`worker`/`migrate` współdzielą jeden obraz, format
+`DATABASE_URL` dla Alembika vs. adapterów, wolumen `job-storage` dzielony
+między `api` i `worker`) opisuje
+[docs/WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md#9-status-implementacji).
 
 ## Testy i kontrola jakości
 
@@ -79,9 +137,10 @@ przypadek użycia screeningu, adaptery plikowe, symulacje wiatru/PV,
 agregację hybrydową, magazyn energii, composition root, API i formularz
 Streamlit, oraz pełną ścieżkę CLI z raportem. Testy integracyjne PyWake,
 pvlib i FastAPI (oznaczone markerami `pywake`/`pvlib`/`web`) są pomijane,
-gdy odpowiedni extra nie jest zainstalowany. Testy adaptera PostGIS
-(marker `postgres`) wymagają dodatkowo działającego Dockera (uruchamiają
-efemeryczny kontener przez testcontainers) i są pomijane bez niego — patrz
+gdy odpowiedni extra nie jest zainstalowany. Testy adaptera PostGIS i
+kolejki zadań/workera (marker `postgres`) wymagają dodatkowo działającego
+Dockera (uruchamiają efemeryczny kontener przez testcontainers) i są
+pomijane bez niego — patrz
 [docs/WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md#34-testowanie-bez-zgadywania).
 
 ## Uruchamianie przez CLI
@@ -150,16 +209,17 @@ HTML lub PDF bez zmiany warstwy aplikacyjnej.
   całego obszaru (brak przestrzennego zróżnicowania zasobu w obrębie farmy);
 - adaptery PyWake i pvlib są opcjonalne — bez nich program używa wbudowanych,
   uproszczonych symulatorów (bez modelu wake / bez modelu inwertera PVWatts);
-- API webowe domyślnie trzyma stan w pamięci procesu (Krok 1, patrz
+- API webowe domyślnie trzyma stan w pamięci procesu i wykonuje screening
+  synchronicznie w ramach requestu (Krok 1, patrz
   [docs/WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md)) — stan nie przetrwa
-  restartu ani nie jest współdzielony między procesami, chyba że ustawiona
-  jest zmienna `DATABASE_URL` (Krok 2, repozytoria PostGIS — patrz sekcja
-  „API webowe z trwałym stanem” wyżej);
-- procesy robocze (worker) dla długich analiz jeszcze nie istnieją — API
-  wykonuje screening synchronicznie w ramach requestu (Krok 3 z
-  [docs/WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md));
-- brak interfejsu mapowego (React/MapLibre) — dostępne są CLI, proste API
-  i formularz Streamlit;
+  restartu ani nie jest współdzielony między procesami, i nie ma kolejki
+  zadań, chyba że ustawiona jest zmienna `DATABASE_URL` (Kroki 2-3,
+  repozytoria PostGIS + worker — patrz sekcja „API webowe z trwałym stanem
+  (PostGIS) i workerem” wyżej);
+- frontend React/MapLibre (`frontend/`) obsługuje tylko nowy screening i
+  jego szczegóły z mapą — brak historii analiz i wyników per-technologia
+  (wymaga endpointów API, których jeszcze nie ma, patrz
+  [docs/WEB_ARCHITECTURE.md](docs/WEB_ARCHITECTURE.md#9-status-implementacji));
 - obsługiwane są pliki GeoJSON, bez automatycznego pobierania danych;
 - wynik screeningu nie jest opinią prawną ani decyzją administracyjną;
 - konfiguracja CLI wymaga zgodnego CRS między granicą i warstwami ograniczeń.

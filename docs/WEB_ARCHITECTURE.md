@@ -325,6 +325,130 @@ następny — zgodnie z AGENTS.md.
   `postgres`) w osobnym jobie CI z Dockerem (GitHub-hosted runner) — lokalnie
   w środowisku bez Dockera te testy pomijają się tak samo jak
   `pywake`/`pvlib` bez zainstalowanej zależności.
-- ⬜ Krok 3 — tabela `jobs` + worker + `202`/polling.
-- ⬜ Krok 4 — frontend React + MapLibre.
-- ⬜ Krok 5 — `docker-compose`.
+- ✅ **Krok 3 — tabela `jobs` + worker + `202`/polling.**
+  `adapters/postgres/jobs.py` (`Job`, `PostgresJobRepository` — kolejka
+  typu "tabela", nie broker, zgodnie z sekcją 4.1: `enqueue`/`get` to proste
+  CRUD, `claim_next` to jedno atomowe `UPDATE ... RETURNING` nad `SELECT
+  ... FOR UPDATE SKIP LOCKED`, bezpieczne przy wielu workerach naraz).
+  Tabela `jobs` dopisana jako `JOBS_TABLE_SQL` w `adapters/postgres/schema.py`
+  (osobna stała, żeby migracja mogła zastosować tylko przyrost, dzieląc
+  jednak dokładnie ten sam tekst DDL co `SCHEMA_SQL`/testy) i migracja
+  Alembic `migrations/versions/a0c2eda6798b_jobs_table.py`.
+  `src/renewable_planner/worker.py` (`run_worker`, uruchamiane przez
+  `python -m renewable_planner.worker` / `donquixote-worker`) odpytuje
+  kolejkę i woła **dokładnie ten sam** `ScreenSite.execute(...)` co tryb
+  synchroniczny — **żadnej zmiany w use case ani w domenie**. Ponieważ
+  `ScreenSite.execute` zawsze sam generuje nowy `AnalysisRun.id`,
+  identyfikator joba (zwracany klientowi w `202`) i identyfikator
+  finalnego `AnalysisRun` to dwa różne UUID, połączone kolumną
+  `jobs.analysis_run_id`; `api/app.py` (`_resolve_run`/`_job_summary`)
+  doczytuje właściwy `AnalysisRun`/wynik, gdy klient polluje po id joba, ale
+  zawsze zwraca z powrotem to samo, stabilne id joba. Ponowne próby:
+  `jobs.attempts`/`last_error`, worker decyduje `queued` (retry) vs
+  `failed` (trwale) po przekroczeniu `max_attempts` — każda próba to
+  odrębny, w pełni identyfikowalny `AnalysisRun`. Tryb async istnieje
+  tylko, gdy ustawione jest `DATABASE_URL` (ten sam przełącznik co Krok 2)
+  — bez niego `POST` pozostaje w pełni synchroniczny jak w Kroku 1, więc
+  żaden test trybu pamięciowego się nie zmienił. Uploady (granica, warstwy,
+  reguły) zapisywane są teraz pod trwałym katalogiem
+  (`DONQUIXOTE_JOB_STORAGE`, domyślnie katalog tymczasowy systemu +
+  `donquixote-jobs/<job id>/`), bo muszą przetrwać do czasu, aż worker je
+  odczyta — w przeciwieństwie do jednorazowego `tempfile.TemporaryDirectory`
+  trybu synchronicznego. Zweryfikowane testami (`tests/test_worker.py`,
+  marker `postgres`) analogicznie do Kroku 2 — bezpośrednio na
+  `PostgresJobRepository`/`run_worker`, nie przez `api/app.py` (ten sam,
+  już zaakceptowany w Kroku 2 zakres testów: przełącznik `DATABASE_URL` w
+  `api/app.py` czytany jest raz przy imporcie modułu).
+- 🟡 **Krok 4 — frontend React + MapLibre (częściowo).**
+  `frontend/` (Vite + React + TypeScript, monorepo, per sekcja 5.1).
+  Zbudowane tylko to, co dzisiejsze API faktycznie wspiera: **Nowy
+  screening** (`NewScreeningPage.tsx` — upload granicy/ograniczeń/reguł,
+  technologia/kraj/data, `POST /v1/screenings`) i **Szczegóły analizy**
+  (`ScreeningDetailsPage.tsx` — `GET /v1/screenings/{id}` odpytywane co 2s
+  aż do stanu końcowego, podsumowanie powierzchni, `FindingsTable.tsx`,
+  link do raportu tekstowego, `ScreeningMap.tsx` z prawdziwą mapą
+  MapLibre). **Lista analiz** i **Wyniki technologii** z tabeli widoków w
+  sekcji 5.2 nie są zbudowane — API nie ma endpointu listującego
+  (`GET /v1/screenings`) ani endpointów technologicznych
+  (`turbine-layout`/`solar-array`/`hybrid`/`battery-dispatch` z sekcji
+  2.2), więc nie ma czego wywoływać; to wymaga najpierw rozszerzenia API.
+  Typy TS generowane z OpenAPI (`openapi-typescript`, `src/api/schema.d.ts`
+  commitowany, regeneracja opisana w `frontend/README.md`), wywołania
+  przez zwykły `fetch` (sekcja 5.3) — bez dodatkowej biblioteki klienta.
+  Dwie małe, towarzyszące zmiany w `api/app.py` (nie dotykają
+  domeny/aplikacji/CLI): CORS ograniczony do `DONQUIXOTE_FRONTEND_ORIGIN`
+  (sekcja 6) i reprojekcja geometrii `GET .../layers/{available|excluded}`
+  do `EPSG:4326` (`_for_map`, przez istniejący
+  `CoordinateReferenceSystemService`) — bo analiza liczy się w metrycznym
+  CRS (np. `EPSG:2180`), a MapLibre renderuje GeoJSON zakładając WGS84;
+  bez tego geometria trafiałaby w złe miejsce na mapie. Zweryfikowane
+  testem `tests/test_api.py::test_get_screening_layers_are_reprojected_to_wgs84_for_the_map`
+  oraz ręcznie, end-to-end w prawdziwej przeglądarce (Playwright,
+  środowisko deweloperskie bez zainstalowanego Node — doinstalowany przez
+  Homebrew) — upload trzech plików z `tests/fixtures/cli_*`, submit,
+  przejście `pending`→`completed`, mapa z warstwami `available`/`excluded`
+  poprawnie narysowanymi. Styl mapy: oficjalny, darmowy
+  `https://demotiles.maplibre.org/style.json` (bez tokenu). Napotkany i
+  naprawiony po drodze problem niezwiązany z MapLibre per se: `tsconfig.node.json`
+  miało `composite: true` bez `noEmit`, więc `tsc -b` (część `npm run
+  build`) emitował przestarzały `vite.config.js` obok `vite.config.ts` —
+  Vite ładował ten pierwszy, więc zmiany w `vite.config.ts` (w tym fix
+  MapLibre/Vite workerów, patrz niżej) były po cichu ignorowane; naprawione
+  przez `emitDeclarationOnly: true` zamiast `noEmit` (composite projects
+  wymagają jakiejś formy emitu). Sam MapLibre + Vite dev server: worker
+  tile'owy MapLibre ładowany jako `new Worker(new URL(...))` nie przeżywa
+  pre-bundlingu esbuild — naprawione przez `optimizeDeps.exclude:
+  ['maplibre-gl']` w `vite.config.ts`.
+- ✅ **Krok 5 — `docker-compose`.** `docker-compose.yml` (root) uruchamia
+  cały stos jednym poleceniem (`docker compose up --build`): `postgres`
+  (`postgis/postgis:16-3.4`, wolumen `postgres-data`, healthcheck
+  `pg_isready`), `migrate` (jednorazowo `alembic upgrade head`), `api`,
+  `worker`, `frontend` — `api`/`worker`/`migrate` to **jeden obraz**
+  (`Dockerfile`, root) z różnym `command:`, żeby nie powielać trzech
+  prawie identycznych Dockerfile'i dla tego samego kodu. `DATABASE_URL` ma
+  dwa różne poprawne formaty współistniejące w tym samym compose: adaptery
+  Postgres łączą się bezpośrednio przez psycopg3 (`postgresql://...`), ale
+  Alembic idzie przez SQLAlchemy i wymaga dialektu `+psycopg`
+  (`postgresql+psycopg://...`, jak już w `.github/workflows/ci.yml`) — te
+  same dane logowania z jednego `.env`/`.env.example`, inny literał
+  schematu per usługa. `api` i `worker` to osobne kontenery, a Krok 3
+  zapisuje/odczytuje uploady joba z dysku (`DONQUIXOTE_JOB_STORAGE`) — bez
+  współdzielonego nazwanego wolumenu (`job-storage`, zamontowanego pod tym
+  samym `/data/jobs` w obu) worker nigdy nie znalazłby plików zapisanych
+  przez `api`; zweryfikowane end-to-end (upload przez `api`, `202`,
+  worker realnie przetwarza joba, `completed` po stronie `GET`).
+  `frontend/Dockerfile` to multi-stage build: `node:22-slim` buduje statyczny
+  bundle (`VITE_API_BASE_URL` jako `ARG`/`ENV` **przed** `npm run build` —
+  Vite zapisuje `VITE_*` w bundlu w czasie builda, nie runtime, i musi to
+  być adres widoczny dla przeglądarki, np. `http://localhost:8000`, nie
+  nazwa hosta w sieci dockerowej typu `http://api:8000`), `nginx:alpine`
+  serwuje wynik. Dwa problemy z MapLibre + produkcyjny build/nginx,
+  napotkane i naprawione przy weryfikacji w przeglądarce (nie w dev
+  serwerze Vite, gdzie działało już od Kroku 4):
+  1. `vite build` nie wykrywał automatycznie wewnętrznego workera
+     kafelkowego MapLibre (`new Worker(new URL(...))` głęboko w
+     `node_modules/maplibre-gl` nie przechodzi przez analizę statyczną
+     Rollupa) — żaden osobny plik workera nie trafiał do `dist/`, mapa
+     była pusta z błędem „Worker failed to load”. Naprawione przez
+     jawne, udokumentowane API MapLibre (`setWorkerUrl`) zamiast polegania
+     na automatycznym wykrywaniu — `postinstall` w `frontend/package.json`
+     kopiuje `maplibre-gl-worker.mjs` **razem z** `maplibre-gl-shared.mjs`
+     (worker importuje ten drugi względną ścieżką, więc musi leżeć obok)
+     do `public/maplibre-gl/`, a `ScreeningMap.tsx` wywołuje
+     `setWorkerUrl` wskazując na tę kopię zanim powstanie jakakolwiek
+     `Map`. Dzięki temu też zbędny stał się dotychczasowy obejście z Kroku
+     4 (`optimizeDeps.exclude: ['maplibre-gl']` w `vite.config.ts`) —
+     usunięte.
+  2. Nawet z poprawną ścieżką worker nadal nie ładował się pod nginksem:
+     wbudowane `mime.types` nginksa nie zna rozszerzenia `.mjs`, więc
+     serwował je jako `application/octet-stream`, a przeglądarka
+     odmawia wykonania tego jako modułu ES. Naprawione w
+     `frontend/nginx.conf` (`location ~ \.mjs$ { default_type
+     application/javascript; }`).
+  Dodatkowo: `migrate`/`api`/`worker` mają `restart: on-failure:5` — przy
+  zupełnie świeżej sieci bywało (obserwowane pod rootless Podmanem, który
+  symulował tu Dockera w środowisku bez `dockerd`), że `postgres` zgłaszał
+  się jako „healthy” odrobinę wcześniej niż jego port TCP realnie
+  przyjmował połączenia; parę prób usuwa ten wyścig bez ręcznej interwencji.
+  Nowy job `docker-build` w CI (`docker compose build`, bez pełnego `up`)
+  pilnuje, żeby Dockerfile'e się nie psuły.

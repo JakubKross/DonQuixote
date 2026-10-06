@@ -79,10 +79,19 @@ Szczegółowy plan i status poszczególnych kroków prowadzi
 - ✅ Krok 2 — PostGIS i adaptery repozytoriów (`adapters/postgres/`, extra
   `postgres`, migracja Alembic), włączane zmienną `DATABASE_URL` —
   repozytoria w pamięci pozostają domyślne, gdy zmienna nie jest ustawiona;
-- ⬜ Krok 3 — tabela `jobs`, worker i przełączenie API na `202`/polling —
-  **następny priorytet**;
-- ⬜ Krok 4 — frontend React + MapLibre z realną mapą;
-- ⬜ Krok 5 — `docker-compose` do uruchomienia całości.
+- ✅ Krok 3 — tabela `jobs`, worker (`renewable_planner.worker`) i
+  przełączenie `POST /v1/screenings` na `202`/polling, włączane tą samą
+  zmienną `DATABASE_URL` co Krok 2 — bez niej API pozostaje w pełni
+  synchroniczne (Krok 1);
+- 🟡 Krok 4 — frontend React + MapLibre z realną mapą (`frontend/`) —
+  częściowo: widoki „Nowy screening” i „Szczegóły analizy” (status z
+  pollingiem, mapa) gotowe; „Lista analiz” i „Wyniki technologii” czekają
+  na brakujące endpointy API (patrz WEB_ARCHITECTURE.md) — **następny
+  priorytet**, żeby dokończyć Etap 8;
+- ✅ Krok 5 — `docker-compose` (`docker-compose.yml`, `Dockerfile`,
+  `frontend/Dockerfile`) uruchamia API + PostGIS + worker + frontend
+  jednym poleceniem (`docker compose up --build`) — działa już dziś mimo
+  częściowego Kroku 4, bo odpala to, co istnieje.
 
 ## Poza obecnym planem etapów
 
