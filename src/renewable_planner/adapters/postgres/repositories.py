@@ -22,6 +22,7 @@ from typing import Any
 from uuid import UUID
 
 import psycopg
+import shapely
 from psycopg.types.json import Jsonb
 
 from renewable_planner.domain.analysis_run import AnalysisRun, AnalysisRunStatus
@@ -364,7 +365,10 @@ def _insert_finding(cur: "psycopg.Cursor[Any]", finding: ConstraintFinding) -> N
 def _maybe_geometry(wkt: str | None, crs: str | None) -> SpatialGeometry | None:
     if wkt is None or crs is None:
         return None
-    return SpatialGeometry(wkt=wkt, crs=crs)
+    # ST_AsText emits compact WKT ("POLYGON((0 0,1 0,...))"); round-trip it
+    # through Shapely so callers get back the same spaced form the domain
+    # produces, not a string that merely describes the same geometry.
+    return SpatialGeometry(wkt=shapely.from_wkt(wkt).wkt, crs=crs)
 
 
 def _row_to_finding(analysis_run_id: UUID, row: Sequence[Any]) -> ConstraintFinding:
