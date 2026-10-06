@@ -37,6 +37,7 @@ if TYPE_CHECKING:
         PostgresJobRepository,
         PostgresProjectRepository,
         PostgresScreeningResultRepository,
+        PostgresTechnologyResultRepository,
     )
 
 
@@ -149,3 +150,21 @@ def build_postgres_job_repository(dsn: str) -> "PostgresJobRepository":
         ) from error
 
     return PostgresJobRepository(dsn)
+
+
+def build_postgres_technology_result_repository(
+    dsn: str,
+) -> "PostgresTechnologyResultRepository":
+    """Wire the Postgres-backed store for wind/solar/hybrid/battery results.
+
+    Same deferred ``psycopg`` import as ``build_postgres_job_repository``.
+    """
+    try:
+        from renewable_planner.adapters.postgres import PostgresTechnologyResultRepository
+    except ImportError as error:
+        raise PostgresUnavailableError(
+            "technology results storage requires the optional 'postgres' extra: "
+            "pip install -e '.[postgres]'"
+        ) from error
+
+    return PostgresTechnologyResultRepository(dsn)

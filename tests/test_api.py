@@ -1,6 +1,7 @@
 """Tests for the FastAPI web interface (Step 1 — synchronous, in-memory)."""
 
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -235,3 +236,175 @@ def test_create_screening_rejects_invalid_site_file(client: TestClient) -> None:
     )
 
     assert response.status_code == 422
+
+
+def _create_screening(client: TestClient) -> str:
+    response = client.post(
+        "/v1/screenings",
+        files=_upload_files(),
+        data={"technology": "wind", "analysis_date": "2026-08-17"},
+    )
+    assert response.status_code == 201
+    screening_id: str = response.json()["id"]
+    return screening_id
+
+
+def _fixture_upload(name: str) -> tuple[str, bytes, str]:
+    return (name, (FIXTURES / name).read_bytes(), "application/x-yaml")
+
+
+def _post_wind(client: TestClient, screening_id: str, *, with_resource: bool = True) -> Any:
+    files = {"turbine_catalog": _fixture_upload("cli_turbine_catalog.yaml")}
+    if with_resource:
+        files["wind_resource"] = _fixture_upload("wind_resource_sample.yaml")
+    return client.post(
+        f"/v1/screenings/{screening_id}/turbine-layout",
+        files=files,
+        data={"spacing_rotor_diameters": "3"},
+    )
+
+
+def test_list_screenings_returns_newest_first(client: TestClient) -> None:
+    first = _create_screening(client)
+    second = _create_screening(client)
+
+    response = client.get("/v1/screenings", params={"limit": 2})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["id"] for item in body] == [second, first]
+    assert body[0]["status"] == "completed"
+    assert body[0]["created_at"] is not None
+
+
+def test_list_screenings_rejects_out_of_range_limit(client: TestClient) -> None:
+    assert client.get("/v1/screenings", params={"limit": 0}).status_code == 422
+
+
+def test_turbine_layout_places_turbines_and_simulates_production(client: TestClient) -> None:
+    screening_id = _create_screening(client)
+
+    response = _post_wind(client, screening_id)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["turbine_model"] == "FW-Test"
+    assert body["turbine_count"] == len(body["positions"]) > 0
+    assert body["crs"] == "EPSG:2180"
+    simulation = body["simulation"]
+    assert simulation["simulator"] == "simple"
+    assert simulation["wake_energy_mwh"] > 0
+    assert len(simulation["wake_profile"]["power_mw"]) == len(
+        simulation["wake_profile"]["timestamps"]
+    )
+
+
+def test_turbine_layout_without_resource_skips_simulation(client: TestClient) -> None:
+    screening_id = _create_screening(client)
+
+    response = _post_wind(client, screening_id, with_resource=False)
+
+    assert response.status_code == 200
+    assert response.json()["simulation"] is None
+
+
+def test_turbine_layout_rejects_unknown_turbine(client: TestClient) -> None:
+    screening_id = _create_screening(client)
+
+    response = client.post(
+        f"/v1/screenings/{screening_id}/turbine-layout",
+        files={"turbine_catalog": _fixture_upload("cli_turbine_catalog.yaml")},
+        data={
+            "spacing_rotor_diameters": "3",
+            "turbine_manufacturer": "Nieznany",
+            "turbine_model": "X",
+        },
+    )
+
+    assert response.status_code == 422
+    assert "not found in catalog" in response.json()["detail"]
+
+
+def test_technology_endpoints_return_404_for_unknown_screening(client: TestClient) -> None:
+    unknown = uuid4()
+
+    assert client.get(f"/v1/screenings/{unknown}/technologies").status_code == 404
+    assert _post_wind(client, str(unknown)).status_code == 404
+
+
+def test_solar_array_sizes_and_simulates(client: TestClient) -> None:
+    screening_id = _create_screening(client)
+
+    response = client.post(
+        f"/v1/screenings/{screening_id}/solar-array",
+        files={
+            "solar_catalog": _fixture_upload("cli_solar_catalog.yaml"),
+            "solar_resource": _fixture_upload("solar_resource_sample.yaml"),
+        },
+        data={"ground_coverage_ratio": "0.5"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["module_count"] > 0
+    assert body["installed_capacity_kwp"] == pytest.approx(body["module_count"] * 0.4)
+    assert body["simulation"]["ac_energy_mwh"] > 0
+
+
+def test_hybrid_requires_a_production_simulation(client: TestClient) -> None:
+    screening_id = _create_screening(client)
+    _post_wind(client, screening_id, with_resource=False)
+
+    response = client.post(
+        f"/v1/screenings/{screening_id}/hybrid", data={"grid_connection_limit_mw": "1"}
+    )
+
+    assert response.status_code == 409
+
+
+def test_battery_dispatch_requires_a_hybrid_result(client: TestClient) -> None:
+    screening_id = _create_screening(client)
+
+    response = client.post(
+        f"/v1/screenings/{screening_id}/battery-dispatch",
+        files={"battery_catalog": _fixture_upload("cli_battery_catalog.yaml")},
+    )
+
+    assert response.status_code == 409
+
+
+def test_wind_hybrid_battery_chain_is_stored_and_rerun_clears_derived_results(
+    client: TestClient,
+) -> None:
+    screening_id = _create_screening(client)
+    wind = _post_wind(client, screening_id).json()
+    # Low enough to force curtailment, so the battery has surplus to absorb.
+    limit_mw = max(wind["simulation"]["wake_profile"]["power_mw"]) / 2
+
+    hybrid = client.post(
+        f"/v1/screenings/{screening_id}/hybrid",
+        data={"grid_connection_limit_mw": str(limit_mw)},
+    )
+    assert hybrid.status_code == 200
+    assert hybrid.json()["sources"] == ["wind"]
+    assert hybrid.json()["curtailed_energy_mwh"] > 0
+
+    battery = client.post(
+        f"/v1/screenings/{screening_id}/battery-dispatch",
+        files={"battery_catalog": _fixture_upload("cli_battery_catalog.yaml")},
+    )
+    assert battery.status_code == 200
+    assert battery.json()["target_power_mw"] == pytest.approx(limit_mw)
+    assert battery.json()["charged_energy_mwh"] > 0
+
+    stored = client.get(f"/v1/screenings/{screening_id}/technologies").json()
+    assert stored["wind"] == wind
+    assert stored["solar"] is None
+    assert stored["hybrid"] == hybrid.json()
+    assert stored["battery"] == battery.json()
+
+    _post_wind(client, screening_id)
+    after_rerun = client.get(f"/v1/screenings/{screening_id}/technologies").json()
+    assert after_rerun["wind"] is not None
+    assert after_rerun["hybrid"] is None
+    assert after_rerun["battery"] is None

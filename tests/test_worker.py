@@ -203,3 +203,14 @@ def test_claim_next_does_not_return_the_same_job_twice(
 def test_job_repository_get_returns_none_for_unknown_id(dsn: str) -> None:
     jobs = PostgresJobRepository(dsn)
     assert jobs.get(uuid4()) is None
+
+
+def test_job_repository_lists_recent_jobs_of_one_type_newest_first(dsn: str) -> None:
+    jobs = PostgresJobRepository(dsn)
+    first = jobs.enqueue(uuid4(), "listing-test", {"n": 1})
+    second = jobs.enqueue(uuid4(), "listing-test", {"n": 2})
+    jobs.enqueue(uuid4(), "other-type", {"n": 3})
+
+    recent = jobs.list_recent("listing-test", 10)
+
+    assert [job.id for job in recent] == [second.id, first.id]

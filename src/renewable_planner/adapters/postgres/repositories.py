@@ -170,6 +170,21 @@ class PostgresAnalysisRunRepository:
             return None
         return _row_to_analysis_run(analysis_run_id, row)
 
+    def list_recent(self, limit: int) -> list[AnalysisRun]:
+        """Return up to ``limit`` runs, newest first."""
+        with psycopg.connect(self._dsn) as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, scenario_id, project_id, site_id, technology, country,
+                       parameters, data_versions, status, created_at, started_at,
+                       finished_at, error_message
+                FROM analysis_runs ORDER BY created_at DESC LIMIT %s
+                """,
+                (limit,),
+            )
+            rows = cur.fetchall()
+        return [_row_to_analysis_run(row[0], row[1:]) for row in rows]
+
 
 def _row_to_analysis_run(analysis_run_id: UUID, row: Sequence[Any]) -> AnalysisRun:
     (

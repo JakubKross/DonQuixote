@@ -93,6 +93,19 @@ class PostgresJobRepository:
             row = cur.fetchone()
         return None if row is None else _row_to_job(row)
 
+    def list_recent(self, job_type: str, limit: int) -> list[Job]:
+        """Return up to ``limit`` jobs of ``job_type``, newest first."""
+        with psycopg.connect(self._dsn) as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT {_COLUMNS} FROM jobs WHERE job_type = %s
+                ORDER BY created_at DESC LIMIT %s
+                """,
+                (job_type, limit),
+            )
+            rows = cur.fetchall()
+        return [_row_to_job(row) for row in rows]
+
     def claim_next(self, worker_id: str) -> Job | None:
         """Atomically claim the oldest queued job, or return None.
 

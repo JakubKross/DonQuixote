@@ -31,7 +31,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Screenings
+         * @description List the most recent screenings, newest first.
+         *
+         *     With the job queue enabled every screening starts as a job, so the
+         *     list is built from jobs (including ones still ``pending``/``running``)
+         *     and uses the same ids ``POST`` returned; otherwise from analysis runs.
+         */
+        get: operations["list_screenings_v1_screenings_get"];
         put?: never;
         /**
          * Create Screening
@@ -114,10 +122,175 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/screenings/{screening_id}/technologies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Technology Results
+         * @description Return every wind/solar/hybrid/battery result stored for a screening.
+         */
+        get: operations["get_technology_results_v1_screenings__screening_id__technologies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/screenings/{screening_id}/turbine-layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Turbine Layout
+         * @description Place turbines on a completed screening's available area and, given a
+         *     wind resource, simulate their production — same use cases as the CLI's
+         *     ``--turbine-catalog``/``--wind-resource`` options.
+         *
+         *     Runs synchronously (docs/WEB_ARCHITECTURE.md section 4.3: orders of
+         *     magnitude faster than the screening itself). Replaces any earlier wind
+         *     result for this screening and clears the hybrid and battery results
+         *     that were derived from it.
+         */
+        post: operations["create_turbine_layout_v1_screenings__screening_id__turbine_layout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/screenings/{screening_id}/solar-array": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Solar Array
+         * @description Size a PV array on a completed screening's available area and, given a
+         *     solar resource, simulate its production — same use cases as the CLI's
+         *     ``--solar-catalog``/``--solar-resource`` options.
+         *
+         *     Synchronous; replaces any earlier solar result for this screening and
+         *     clears the hybrid and battery results that were derived from it.
+         */
+        post: operations["create_solar_array_v1_screenings__screening_id__solar_array_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/screenings/{screening_id}/hybrid": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Hybrid
+         * @description Combine the stored wind and/or solar production profiles and clip the
+         *     total to the grid connection limit (CLI: ``--grid-connection-limit-mw``).
+         *
+         *     Requires at least one of ``turbine-layout``/``solar-array`` to have run
+         *     with a resource file, so there is a production profile to aggregate.
+         *     Clears the battery result derived from an earlier hybrid result.
+         */
+        post: operations["create_hybrid_v1_screenings__screening_id__hybrid_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/screenings/{screening_id}/battery-dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Battery Dispatch
+         * @description Dispatch a battery against the stored hybrid aggregate profile, with
+         *     the hybrid grid connection limit as target power (CLI:
+         *     ``--battery-catalog``). Requires a hybrid result.
+         */
+        post: operations["create_battery_dispatch_v1_screenings__screening_id__battery_dispatch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * BatteryResult
+         * @description Outcome of ``POST /v1/screenings/{id}/battery-dispatch``.
+         */
+        BatteryResult: {
+            /** Battery Manufacturer */
+            battery_manufacturer: string;
+            /** Battery Model */
+            battery_model: string;
+            /** Target Power Mw */
+            target_power_mw: number;
+            /** Initial State Of Charge Fraction */
+            initial_state_of_charge_fraction: number;
+            /** Charged Energy Mwh */
+            charged_energy_mwh: number;
+            /** Discharged Energy Mwh */
+            discharged_energy_mwh: number;
+            /** Round Trip Loss Mwh */
+            round_trip_loss_mwh: number;
+            /** Curtailed Energy Mwh */
+            curtailed_energy_mwh: number;
+            /** Final State Of Charge Fraction */
+            final_state_of_charge_fraction: number;
+            delivered_profile: components["schemas"]["ProfileSeries"];
+            /** State Of Charge Fraction */
+            state_of_charge_fraction: number[];
+        };
+        /** Body_create_battery_dispatch_v1_screenings__screening_id__battery_dispatch_post */
+        Body_create_battery_dispatch_v1_screenings__screening_id__battery_dispatch_post: {
+            /**
+             * Battery Catalog
+             * @description Katalog magazynów (YAML/JSON)
+             */
+            battery_catalog: string;
+            /** Battery Manufacturer */
+            battery_manufacturer?: string | null;
+            /** Battery Model */
+            battery_model?: string | null;
+            /** Initial State Of Charge Fraction */
+            initial_state_of_charge_fraction?: number | null;
+        };
+        /** Body_create_hybrid_v1_screenings__screening_id__hybrid_post */
+        Body_create_hybrid_v1_screenings__screening_id__hybrid_post: {
+            /** Grid Connection Limit Mw */
+            grid_connection_limit_mw: number;
+        };
         /** Body_create_screening_v1_screenings_post */
         Body_create_screening_v1_screenings_post: {
             /**
@@ -144,6 +317,76 @@ export interface components {
             country: string;
             /** Analysis Date */
             analysis_date?: string | null;
+        };
+        /** Body_create_solar_array_v1_screenings__screening_id__solar_array_post */
+        Body_create_solar_array_v1_screenings__screening_id__solar_array_post: {
+            /**
+             * Solar Catalog
+             * @description Katalog modułów PV (YAML/JSON)
+             */
+            solar_catalog: string;
+            /** Ground Coverage Ratio */
+            ground_coverage_ratio: number;
+            /** Solar Manufacturer */
+            solar_manufacturer?: string | null;
+            /** Solar Model */
+            solar_model?: string | null;
+            /**
+             * Solar Resource
+             * @description Godzinowy szereg nasłonecznienia (YAML/JSON)
+             */
+            solar_resource?: string | null;
+            /**
+             * Use Pvlib
+             * @default false
+             */
+            use_pvlib: boolean;
+            /**
+             * Technical Availability
+             * @default 1
+             */
+            technical_availability: number;
+            /**
+             * Loss Factor
+             * @default 0
+             */
+            loss_factor: number;
+        };
+        /** Body_create_turbine_layout_v1_screenings__screening_id__turbine_layout_post */
+        Body_create_turbine_layout_v1_screenings__screening_id__turbine_layout_post: {
+            /**
+             * Turbine Catalog
+             * @description Katalog turbin (YAML/JSON)
+             */
+            turbine_catalog: string;
+            /** Spacing Rotor Diameters */
+            spacing_rotor_diameters: number;
+            /** Grid Spacing M */
+            grid_spacing_m?: number | null;
+            /** Turbine Manufacturer */
+            turbine_manufacturer?: string | null;
+            /** Turbine Model */
+            turbine_model?: string | null;
+            /**
+             * Wind Resource
+             * @description Godzinowy szereg wiatru (YAML/JSON)
+             */
+            wind_resource?: string | null;
+            /**
+             * Use Pywake
+             * @default false
+             */
+            use_pywake: boolean;
+            /**
+             * Technical Availability
+             * @default 1
+             */
+            technical_availability: number;
+            /**
+             * Loss Factor
+             * @default 0
+             */
+            loss_factor: number;
         };
         /**
          * FindingSummary
@@ -177,6 +420,42 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
+         * HybridResult
+         * @description Outcome of ``POST /v1/screenings/{id}/hybrid``.
+         */
+        HybridResult: {
+            /** Grid Connection Limit Mw */
+            grid_connection_limit_mw: number;
+            /** Sources */
+            sources: string[];
+            /** Aggregate Energy Mwh */
+            aggregate_energy_mwh: number;
+            /** Delivered Energy Mwh */
+            delivered_energy_mwh: number;
+            /** Curtailed Energy Mwh */
+            curtailed_energy_mwh: number;
+            /** Curtailed Energy Fraction */
+            curtailed_energy_fraction: number;
+            /** Utilization Fraction */
+            utilization_fraction: number;
+            aggregate_profile: components["schemas"]["ProfileSeries"];
+            delivered_profile: components["schemas"]["ProfileSeries"];
+        };
+        /**
+         * ProfileSeries
+         * @description An hourly ``EnergyProfile`` as parallel arrays, ready to chart.
+         */
+        ProfileSeries: {
+            /** Source */
+            source: string;
+            /** Timestamps */
+            timestamps: string[];
+            /** Power Mw */
+            power_mw: number[];
+            /** Total Energy Mwh */
+            total_energy_mwh: number;
+        };
+        /**
          * ScreeningSummary
          * @description Everything a client needs after creating or looking up a screening.
          *
@@ -206,6 +485,8 @@ export interface components {
             country: string;
             /** Status */
             status: string;
+            /** Created At */
+            created_at?: string | null;
             /** Error Message */
             error_message?: string | null;
             /** Initial Area Square Meters */
@@ -219,6 +500,69 @@ export interface components {
             /** Findings */
             findings?: components["schemas"]["FindingSummary"][];
         };
+        /**
+         * SolarResult
+         * @description Outcome of ``POST /v1/screenings/{id}/solar-array``.
+         */
+        SolarResult: {
+            /** Module Manufacturer */
+            module_manufacturer: string;
+            /** Module Model */
+            module_model: string;
+            /** Ground Coverage Ratio */
+            ground_coverage_ratio: number;
+            /** Module Count */
+            module_count: number;
+            /** Installed Capacity Kwp */
+            installed_capacity_kwp: number;
+            /** Used Area M2 */
+            used_area_m2: number;
+            simulation?: components["schemas"]["SolarSimulationSummary"] | null;
+        };
+        /** SolarSimulationSummary */
+        SolarSimulationSummary: {
+            /** Simulator */
+            simulator: string;
+            /** Dc Energy Mwh */
+            dc_energy_mwh: number;
+            /** Ac Energy Mwh */
+            ac_energy_mwh: number;
+            /** Inverter Loss Mwh */
+            inverter_loss_mwh: number;
+            /** Inverter Loss Fraction */
+            inverter_loss_fraction: number;
+            ac_profile: components["schemas"]["ProfileSeries"];
+        };
+        /**
+         * TechnologyResults
+         * @description Every technology result stored for one screening so far.
+         *
+         *     Each field is ``None`` until its ``POST`` endpoint has run for this
+         *     screening. Re-running wind or solar clears ``hybrid`` and ``battery``,
+         *     and re-running hybrid clears ``battery``, so stored results never mix
+         *     inputs from different runs.
+         */
+        TechnologyResults: {
+            /**
+             * Screening Id
+             * Format: uuid
+             */
+            screening_id: string;
+            wind?: components["schemas"]["WindResult"] | null;
+            solar?: components["schemas"]["SolarResult"] | null;
+            hybrid?: components["schemas"]["HybridResult"] | null;
+            battery?: components["schemas"]["BatteryResult"] | null;
+        };
+        /**
+         * TurbinePositionSummary
+         * @description One turbine candidate, in the screening's metric analysis CRS.
+         */
+        TurbinePositionSummary: {
+            /** X M */
+            x_m: number;
+            /** Y M */
+            y_m: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -231,6 +575,48 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * WindResult
+         * @description Outcome of ``POST /v1/screenings/{id}/turbine-layout``.
+         *
+         *     ``simulation`` is ``None`` when no wind resource was uploaded, or when
+         *     no turbine fitted the available area (nothing to simulate).
+         */
+        WindResult: {
+            /** Turbine Manufacturer */
+            turbine_manufacturer: string;
+            /** Turbine Model */
+            turbine_model: string;
+            /** Rated Power Kw */
+            rated_power_kw: number;
+            /** Rotor Diameter M */
+            rotor_diameter_m: number;
+            /** Spacing Rotor Diameters */
+            spacing_rotor_diameters: number;
+            /** Grid Spacing M */
+            grid_spacing_m: number | null;
+            /** Crs */
+            crs: string;
+            /** Turbine Count */
+            turbine_count: number;
+            /** Positions */
+            positions: components["schemas"]["TurbinePositionSummary"][];
+            simulation?: components["schemas"]["WindSimulationSummary"] | null;
+        };
+        /** WindSimulationSummary */
+        WindSimulationSummary: {
+            /** Simulator */
+            simulator: string;
+            /** No Wake Energy Mwh */
+            no_wake_energy_mwh: number;
+            /** Wake Energy Mwh */
+            wake_energy_mwh: number;
+            /** Wake Loss Mwh */
+            wake_loss_mwh: number;
+            /** Wake Loss Fraction */
+            wake_loss_fraction: number;
+            wake_profile: components["schemas"]["ProfileSeries"];
         };
     };
     responses: never;
@@ -259,6 +645,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    list_screenings_v1_screenings_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -379,6 +796,177 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_technology_results_v1_screenings__screening_id__technologies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screening_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TechnologyResults"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_turbine_layout_v1_screenings__screening_id__turbine_layout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screening_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_create_turbine_layout_v1_screenings__screening_id__turbine_layout_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_solar_array_v1_screenings__screening_id__solar_array_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screening_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_create_solar_array_v1_screenings__screening_id__solar_array_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SolarResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_hybrid_v1_screenings__screening_id__hybrid_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screening_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["Body_create_hybrid_v1_screenings__screening_id__hybrid_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HybridResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_battery_dispatch_v1_screenings__screening_id__battery_dispatch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screening_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_create_battery_dispatch_v1_screenings__screening_id__battery_dispatch_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatteryResult"];
                 };
             };
             /** @description Validation Error */

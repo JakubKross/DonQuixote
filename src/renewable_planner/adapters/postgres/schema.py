@@ -8,7 +8,8 @@ and does not require Alembic to be configured just to run a test suite.
 
 Only the tables needed to replace ``adapters.memory_repositories`` (projects,
 analysis runs, screening results + their findings) plus the ``jobs`` queue
-table (Step 3) are defined here. ``sites``, ``spatial_constraints`` and
+table (Step 3) and ``technology_results`` (wind/solar/hybrid/battery
+results of the web API) are defined here. ``sites``, ``spatial_constraints`` and
 ``spatial_data_layers`` from the full schema sketch in WEB_ARCHITECTURE.md
 are not needed yet: the web API still reads site boundaries and
 rule/constraint layers from uploaded files (see
@@ -19,7 +20,8 @@ until automatic official data sources are in scope.
 can apply just the new table (incrementally, like a normal migration) while
 still sharing the exact same DDL text that ``SCHEMA_SQL`` (and the test
 suite, which applies ``SCHEMA_SQL`` directly) uses — one definition, no risk
-of the two drifting apart.
+of the two drifting apart. ``TECHNOLOGY_RESULTS_TABLE_SQL`` is split out
+the same way, for its own migration.
 """
 
 _CORE_SCHEMA_SQL = """
@@ -104,4 +106,14 @@ CREATE INDEX IF NOT EXISTS jobs_status_created_at_idx
     ON jobs (status, created_at);
 """
 
-SCHEMA_SQL = _CORE_SCHEMA_SQL + JOBS_TABLE_SQL
+TECHNOLOGY_RESULTS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS technology_results (
+    analysis_run_id UUID NOT NULL REFERENCES analysis_runs (id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (analysis_run_id, kind)
+);
+"""
+
+SCHEMA_SQL = _CORE_SCHEMA_SQL + JOBS_TABLE_SQL + TECHNOLOGY_RESULTS_TABLE_SQL

@@ -13,6 +13,8 @@ to the API layer beyond composition wiring.
 """
 
 import threading
+from collections.abc import Iterable
+from typing import Any
 from uuid import UUID
 
 from renewable_planner.domain.analysis_run import AnalysisRun
@@ -56,6 +58,13 @@ class InMemoryAnalysisRunRepository:
         with self._lock:
             return self._runs.get(analysis_run_id)
 
+    def list_recent(self, limit: int) -> list[AnalysisRun]:
+        """Return up to ``limit`` runs, newest first."""
+        with self._lock:
+            runs = list(self._runs.values())
+        runs.sort(key=lambda run: run.created_at, reverse=True)
+        return runs[:limit]
+
 
 class InMemoryScreeningResultRepository:
     """Keep the screening result for every analysis run, keyed by run id."""
@@ -71,3 +80,30 @@ class InMemoryScreeningResultRepository:
     def get(self, analysis_run_id: UUID) -> ScreenSiteResult | None:
         with self._lock:
             return self._results.get(analysis_run_id)
+
+
+class InMemoryTechnologyResultRepository:
+    """Keep technology results (wind/solar/hybrid/battery) per analysis run.
+
+    Like the job queue, this is web-interface infrastructure rather than a
+    port: the technology use cases return their results and never store
+    them. Payloads are the API's own JSON-ready response shapes, so this
+    and the PostGIS variant store exactly the same thing.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._results: dict[tuple[UUID, str], dict[str, Any]] = {}
+
+    def save(self, analysis_run_id: UUID, kind: str, payload: dict[str, Any]) -> None:
+        with self._lock:
+            self._results[(analysis_run_id, kind)] = payload
+
+    def get(self, analysis_run_id: UUID, kind: str) -> dict[str, Any] | None:
+        with self._lock:
+            return self._results.get((analysis_run_id, kind))
+
+    def delete(self, analysis_run_id: UUID, kinds: Iterable[str]) -> None:
+        with self._lock:
+            for kind in kinds:
+                self._results.pop((analysis_run_id, kind), None)

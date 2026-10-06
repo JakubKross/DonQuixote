@@ -23,6 +23,7 @@ from renewable_planner.adapters.postgres import (  # noqa: E402
     PostgresAnalysisRunRepository,
     PostgresProjectRepository,
     PostgresScreeningResultRepository,
+    PostgresTechnologyResultRepository,
 )
 from renewable_planner.adapters.postgres.schema import SCHEMA_SQL  # noqa: E402
 from renewable_planner.domain import (  # noqa: E402
@@ -187,3 +188,38 @@ def test_screening_result_repository_handles_no_available_area(dsn: str) -> None
     assert fetched.spatial_result.excluded_geometry is None
     assert fetched.spatial_result.remaining_geometry is None
     assert fetched.spatial_result.findings == ()
+
+
+def test_analysis_run_repository_lists_recent_runs_newest_first(dsn: str) -> None:
+    repository = PostgresAnalysisRunRepository(dsn)
+    # Far in the future so they sort ahead of runs saved by other tests.
+    older = AnalysisRun(created_at=START + timedelta(days=3650))
+    newer = AnalysisRun(created_at=START + timedelta(days=3651))
+    repository.save(older)
+    repository.save(newer)
+
+    recent = repository.list_recent(2)
+
+    assert [run.id for run in recent] == [newer.id, older.id]
+    assert recent[0] == newer
+
+
+def test_technology_result_repository_saves_replaces_and_deletes(dsn: str) -> None:
+    runs = PostgresAnalysisRunRepository(dsn)
+    repository = PostgresTechnologyResultRepository(dsn)
+    run = AnalysisRun(
+        status=AnalysisRunStatus.COMPLETED,
+        started_at=START,
+        finished_at=START + timedelta(hours=1),
+    )
+    runs.save(run)
+
+    assert repository.get(run.id, "wind") is None
+    repository.save(run.id, "wind", {"turbine_count": 3, "positions": [{"x_m": 1.0}]})
+    repository.save(run.id, "wind", {"turbine_count": 4})
+    repository.save(run.id, "hybrid", {"sources": ["wind"]})
+
+    assert repository.get(run.id, "wind") == {"turbine_count": 4}
+    repository.delete(run.id, ("hybrid", "battery"))
+    assert repository.get(run.id, "hybrid") is None
+    assert repository.get(run.id, "wind") == {"turbine_count": 4}

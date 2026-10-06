@@ -11,14 +11,23 @@ from renewable_planner.adapters.postgres.repositories import (
     PostgresProjectRepository,
     PostgresScreeningResultRepository,
 )
-from renewable_planner.adapters.postgres.schema import JOBS_TABLE_SQL, SCHEMA_SQL
+from renewable_planner.adapters.postgres.schema import (
+    JOBS_TABLE_SQL,
+    SCHEMA_SQL,
+    TECHNOLOGY_RESULTS_TABLE_SQL,
+)
+from renewable_planner.adapters.postgres.technology_results import (
+    PostgresTechnologyResultRepository,
+)
 
 __all__ = [
     "JOBS_TABLE_SQL",
     "SCHEMA_SQL",
+    "TECHNOLOGY_RESULTS_TABLE_SQL",
     "Job",
     "PostgresAnalysisRunRepository",
     "PostgresJobRepository",
     "PostgresProjectRepository",
     "PostgresScreeningResultRepository",
+    "PostgresTechnologyResultRepository",
 ]
