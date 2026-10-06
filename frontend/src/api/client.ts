@@ -2,6 +2,12 @@ import type { components } from "./schema";
 
 export type ScreeningSummary = components["schemas"]["ScreeningSummary"];
 export type FindingSummary = components["schemas"]["FindingSummary"];
+export type ProfileSeries = components["schemas"]["ProfileSeries"];
+export type WindResult = components["schemas"]["WindResult"];
+export type SolarResult = components["schemas"]["SolarResult"];
+export type HybridResult = components["schemas"]["HybridResult"];
+export type BatteryResult = components["schemas"]["BatteryResult"];
+export type TechnologyResults = components["schemas"]["TechnologyResults"];
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -77,4 +83,55 @@ export async function getScreeningLayer(
 ): Promise<GeoJSON.FeatureCollection> {
   const response = await fetch(screeningLayerUrl(screeningId, layer));
   return asJson<GeoJSON.FeatureCollection>(response);
+}
+
+export async function listScreenings(limit = 50): Promise<ScreeningSummary[]> {
+  const response = await fetch(`${API_BASE_URL}/v1/screenings?limit=${limit}`);
+  return asJson<ScreeningSummary[]>(response);
+}
+
+export async function getTechnologyResults(screeningId: string): Promise<TechnologyResults> {
+  const response = await fetch(`${API_BASE_URL}/v1/screenings/${screeningId}/technologies`);
+  return asJson<TechnologyResults>(response);
+}
+
+/** Form fields of a technology request; empty strings and null files are left out,
+ * so optional API parameters fall back to their server-side defaults. */
+export type TechnologyForm = Record<string, string | boolean | File | null | undefined>;
+
+function toFormData(fields: TechnologyForm): FormData {
+  const body = new FormData();
+  for (const [name, value] of Object.entries(fields)) {
+    if (value === null || value === undefined || value === "") continue;
+    body.set(name, value instanceof File ? value : String(value));
+  }
+  return body;
+}
+
+async function postTechnology<T>(
+  screeningId: string,
+  endpoint: string,
+  fields: TechnologyForm,
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}/v1/screenings/${screeningId}/${endpoint}`, {
+    method: "POST",
+    body: toFormData(fields),
+  });
+  return asJson<T>(response);
+}
+
+export function createTurbineLayout(screeningId: string, fields: TechnologyForm) {
+  return postTechnology<WindResult>(screeningId, "turbine-layout", fields);
+}
+
+export function createSolarArray(screeningId: string, fields: TechnologyForm) {
+  return postTechnology<SolarResult>(screeningId, "solar-array", fields);
+}
+
+export function createHybrid(screeningId: string, fields: TechnologyForm) {
+  return postTechnology<HybridResult>(screeningId, "hybrid", fields);
+}
+
+export function createBatteryDispatch(screeningId: string, fields: TechnologyForm) {
+  return postTechnology<BatteryResult>(screeningId, "battery-dispatch", fields);
 }

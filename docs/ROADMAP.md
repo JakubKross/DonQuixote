@@ -83,11 +83,10 @@ Szczegółowy plan i status poszczególnych kroków prowadzi
   przełączenie `POST /v1/screenings` na `202`/polling, włączane tą samą
   zmienną `DATABASE_URL` co Krok 2 — bez niej API pozostaje w pełni
   synchroniczne (Krok 1);
-- 🟡 Krok 4 — frontend React + MapLibre z realną mapą (`frontend/`) —
-  częściowo: widoki „Nowy screening” i „Szczegóły analizy” (status z
-  pollingiem, mapa) gotowe; „Lista analiz” i „Wyniki technologii” czekają
-  na brakujące endpointy API (patrz WEB_ARCHITECTURE.md) — **następny
-  priorytet**, żeby dokończyć Etap 8;
+- ✅ Krok 4 — frontend React + MapLibre z realną mapą (`frontend/`):
+  „Lista analiz”, „Nowy screening”, „Szczegóły analizy” (status z
+  pollingiem, mapa) i „Wyniki technologii” (wiatr, PV, hybryda, magazyn —
+  formularze i wykresy profili godzinowych);
 - ✅ Krok 5 — `docker-compose` (`docker-compose.yml`, `Dockerfile`,
   `frontend/Dockerfile`) uruchamia API + PostGIS + worker + frontend
   jednym poleceniem (`docker compose up --build`) — działa już dziś mimo

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { ApiError, ScreeningSummary, getScreening, screeningReportUrl } from "../api/client";
 import FindingsTable from "../components/FindingsTable";
@@ -46,6 +46,9 @@ export default function ScreeningDetailsPage() {
 
   return (
     <section>
+      <p>
+        <Link to="/">← Lista analiz</Link>
+      </p>
       <h1>Screening {summary.id}</h1>
       <p>
         <StatusBadge status={summary.status} /> — {summary.technology} / {summary.country}
@@ -82,6 +85,10 @@ export default function ScreeningDetailsPage() {
             <a href={screeningReportUrl(summary.id)} target="_blank" rel="noreferrer">
               Pełny raport tekstowy
             </a>
+            {" · "}
+            <Link to={`/screenings/${summary.id}/technologies`}>
+              Wyniki technologii (wiatr, PV, hybryda, magazyn) →
+            </Link>
           </p>
           <ScreeningMap screeningId={summary.id} />
         </>

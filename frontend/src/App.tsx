@@ -1,4 +1,4 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 
 export default function App() {
   return (
@@ -8,6 +8,12 @@ export default function App() {
           DonQuixote
         </Link>
         <span className="app-subtitle">wstępny screening OZE</span>
+        <nav className="app-nav">
+          <NavLink to="/" end>
+            Analizy
+          </NavLink>
+          <NavLink to="/new">Nowy screening</NavLink>
+        </nav>
       </header>
       <main className="app-main">
         <Outlet />

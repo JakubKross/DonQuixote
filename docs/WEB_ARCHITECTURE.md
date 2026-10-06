@@ -359,7 +359,7 @@ następny — zgodnie z AGENTS.md.
   `PostgresJobRepository`/`run_worker`, nie przez `api/app.py` (ten sam,
   już zaakceptowany w Kroku 2 zakres testów: przełącznik `DATABASE_URL` w
   `api/app.py` czytany jest raz przy imporcie modułu).
-- 🟡 **Krok 4 — frontend React + MapLibre (częściowo).**
+- ✅ **Krok 4 — frontend React + MapLibre.**
   `frontend/` (Vite + React + TypeScript, monorepo, per sekcja 5.1).
   Zbudowane tylko to, co dzisiejsze API faktycznie wspiera: **Nowy
   screening** (`NewScreeningPage.tsx` — upload granicy/ograniczeń/reguł,
@@ -368,10 +368,23 @@ następny — zgodnie z AGENTS.md.
   aż do stanu końcowego, podsumowanie powierzchni, `FindingsTable.tsx`,
   link do raportu tekstowego, `ScreeningMap.tsx` z prawdziwą mapą
   MapLibre). **Lista analiz** i **Wyniki technologii** z tabeli widoków w
-  sekcji 5.2 nie są zbudowane — API nie ma endpointu listującego
-  (`GET /v1/screenings`) ani endpointów technologicznych
-  (`turbine-layout`/`solar-array`/`hybrid`/`battery-dispatch` z sekcji
-  2.2), więc nie ma czego wywoływać; to wymaga najpierw rozszerzenia API.
+  sekcji 5.2 doszły w drugiej kolejności: `ScreeningListPage.tsx`
+  (strona główna, `/`; formularz nowego screeningu przeniesiony pod `/new`)
+  i `TechnologyResultsPage.tsx` (`/screenings/{id}/technologies` —
+  formularz i wynik dla każdej technologii, wykresy profili godzinowych w
+  `ProfileChart.tsx`: własny SVG bez biblioteki wykresów, crosshair z
+  tooltipem, legenda, widok tabeli). Endpointy, na których stoją: `GET /v1/screenings` (lista, od najnowszych, `limit`;
+  w trybie kolejki budowana z tabeli `jobs`, więc obejmuje też screeningi
+  `pending`/`running`) oraz endpointy technologiczne z sekcji 2.2 —
+  `POST .../turbine-layout`, `.../solar-array`, `.../hybrid`,
+  `.../battery-dispatch` i `GET .../technologies`. Zgodnie z sekcją 4.3
+  działają synchronicznie (w obu trybach), wołając te same use case'y co
+  CLI; wyniki zapisywane są per screening (w pamięci albo w tabeli
+  `technology_results`, migracja `5d1e7b3c9f20`), bo hybryda korzysta z
+  profili wiatru/PV, a magazyn z profilu hybrydy. Ponowne uruchomienie
+  wiatru/PV kasuje pochodne wyniki hybrydy i magazynu, a ponowna hybryda —
+  magazynu, żeby zapisane wyniki nigdy nie mieszały różnych danych
+  wejściowych.
   Typy TS generowane z OpenAPI (`openapi-typescript`, `src/api/schema.d.ts`
   commitowany, regeneracja opisana w `frontend/README.md`), wywołania
   przez zwykły `fetch` (sekcja 5.3) — bez dodatkowej biblioteki klienta.
