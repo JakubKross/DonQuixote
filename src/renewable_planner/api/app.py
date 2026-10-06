@@ -8,26 +8,32 @@ file-based adapters (`load_site`, `write_screening_outputs`) the other two
 interfaces already use.
 
 Unlike CLI/Streamlit (one screening per process, never looked up again),
-results here are kept in process-shared in-memory repositories
-(:mod:`renewable_planner.adapters.memory_repositories`) so a screening
-created by one request can be read back by a later one — an explicit,
-documented Step 1 limitation: state is lost on restart and not shared across
-worker processes. Step 2 (PostGIS) replaces these with persistent adapters
-implementing the very same ports, with no change to the routes below beyond
-composition wiring.
+results here are kept in process-shared repositories so a screening created
+by one request can be read back by a later one. By default that is the
+in-memory adapters (:mod:`renewable_planner.adapters.memory_repositories`)
+— an explicit, documented Step 1 limitation: state is lost on restart and
+not shared across worker processes. Setting the ``DATABASE_URL`` environment
+variable switches to persistent PostGIS-backed adapters instead (Step 2,
+:mod:`renewable_planner.adapters.postgres`) implementing the very same
+ports, with no change to the routes below beyond composition wiring.
 
 Run with:
 
     uvicorn renewable_planner.api.app:app --reload
+
+Against Postgres instead of in-memory state:
+
+    DATABASE_URL=postgresql://user:pass@host/db uvicorn renewable_planner.api.app:app
 """
 
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 from datetime import date
 from pathlib import Path
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
@@ -48,8 +54,19 @@ from renewable_planner.application.spatial import (
     ScreenSiteCommand,
     ScreenSiteError,
 )
-from renewable_planner.composition import build_file_screen_site, build_text_report_generator
+from renewable_planner.composition import (
+    build_file_screen_site,
+    build_postgres_repositories,
+    build_text_report_generator,
+)
 from renewable_planner.domain import AnalysisRun, ScreenSiteResult
+
+if TYPE_CHECKING:
+    from renewable_planner.adapters.postgres import (
+        PostgresAnalysisRunRepository,
+        PostgresProjectRepository,
+        PostgresScreeningResultRepository,
+    )
 
 DEFAULT_COUNTRY = "PL"
 
@@ -60,9 +77,20 @@ app = FastAPI(
 )
 
 # Process-shared state — see the module docstring and docs/WEB_ARCHITECTURE.md.
-_projects = InMemoryProjectRepository()
-_runs = InMemoryAnalysisRunRepository()
-_results = InMemoryScreeningResultRepository()
+# ``DATABASE_URL`` set → persistent PostGIS-backed repositories (Step 2);
+# unset (the default) → in-memory ones (Step 1), same as before this switch
+# was added, so existing deployments and tests are unaffected.
+_projects: InMemoryProjectRepository | PostgresProjectRepository
+_runs: InMemoryAnalysisRunRepository | PostgresAnalysisRunRepository
+_results: InMemoryScreeningResultRepository | PostgresScreeningResultRepository
+
+_database_url = os.environ.get("DATABASE_URL")
+if _database_url:
+    _projects, _runs, _results = build_postgres_repositories(_database_url)
+else:
+    _projects = InMemoryProjectRepository()
+    _runs = InMemoryAnalysisRunRepository()
+    _results = InMemoryScreeningResultRepository()
 
 
 @app.get("/")

@@ -7,6 +7,7 @@ screening logic or composition — each one only supplies file paths.
 """
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from renewable_planner.adapters.geospatial.file_screening import (
     FileProjectRepository,
@@ -29,6 +30,13 @@ from renewable_planner.application.spatial import ScreenSite, SpatialRuleEngine
 from renewable_planner.domain.project import Project
 from renewable_planner.domain.site import Site
 from renewable_planner.ports.screening import AnalysisRunRepository, SiteScreeningResultRepository
+
+if TYPE_CHECKING:
+    from renewable_planner.adapters.postgres import (
+        PostgresAnalysisRunRepository,
+        PostgresProjectRepository,
+        PostgresScreeningResultRepository,
+    )
 
 
 def build_file_screen_site(
@@ -71,3 +79,47 @@ def build_file_screen_site(
 def build_text_report_generator() -> GenerateAnalysisReport:
     """Wire the plain-text ``GenerateAnalysisReport`` use case."""
     return GenerateAnalysisReport(TextAnalysisReportGenerator())
+
+
+class PostgresUnavailableError(RuntimeError):
+    """Raised when PostGIS-backed repositories are requested without the
+    optional ``postgres`` extra (``psycopg``) installed."""
+
+
+def build_postgres_repositories(
+    dsn: str,
+) -> tuple[
+    "PostgresProjectRepository",
+    "PostgresAnalysisRunRepository",
+    "PostgresScreeningResultRepository",
+]:
+    """Wire process-shared, Postgres/PostGIS-backed repositories.
+
+    Mirrors ``adapters.memory_repositories``'s three classes but persists to
+    a database instead of an in-process dict — Step 2 of the plan in
+    docs/WEB_ARCHITECTURE.md. Callers (``api/app.py``) pass these into
+    ``build_file_screen_site`` exactly like the in-memory ones, so no route
+    changes anywhere: only this composition wiring differs.
+
+    The import of ``adapters.postgres`` (and, transitively, ``psycopg``) is
+    deferred to inside this function rather than done at module level, so
+    that importing ``composition`` — used by the CLI and Streamlit, which
+    never call this function — never requires the optional ``postgres``
+    extra to be installed.
+    """
+    try:
+        from renewable_planner.adapters.postgres import (
+            PostgresAnalysisRunRepository,
+            PostgresProjectRepository,
+            PostgresScreeningResultRepository,
+        )
+    except ImportError as error:
+        raise PostgresUnavailableError(
+            "PostGIS-backed repositories require the optional 'postgres' extra: "
+            "pip install -e '.[postgres]'"
+        ) from error
+
+    projects = PostgresProjectRepository(dsn)
+    runs = PostgresAnalysisRunRepository(dsn)
+    results = PostgresScreeningResultRepository(dsn, runs)
+    return projects, runs, results

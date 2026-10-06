@@ -23,14 +23,18 @@ interfejsu.
    `AnalysisReportGenerator`.
 4. **Adapters** — pliki GeoJSON/YAML, GeoPandas, Shapely, PyProj, raport
    tekstowy, wbudowane symulatory wiatru/PV, opcjonalne adaptery PyWake i
-   pvlib, repozytoria w pamięci (`adapters/memory_repositories.py`, używane
-   przez API). Adaptery plikowe składają zależności dla CLI i Streamlit
+   pvlib, repozytoria w pamięci (`adapters/memory_repositories.py`) i
+   repozytoria PostGIS (`adapters/postgres/`, opcjonalny extra `postgres`,
+   migracje Alembic w `migrations/`) — oba implementują te same porty i są
+   wymienne przez `composition.py`, tylko API o tym decyduje (zmienna
+   `DATABASE_URL`). Adaptery plikowe składają zależności dla CLI i Streamlit
    przez wspólny `composition.py`.
 5. **Interfaces** — CLI (`cli.py`), formularz Streamlit (`streamlit_app.py`,
    schematyczny podgląd SVG bez georeferencji) i proste API webowe
-   (`api/`, FastAPI, opcjonalny extra `web`, repozytoria w pamięci — patrz
-   [WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md)). Frontend React + MapLibre z
-   realną mapą jest planowany, ale nie jest jeszcze zaimplementowany.
+   (`api/`, FastAPI, opcjonalny extra `web`, repozytoria w pamięci lub
+   PostGIS — patrz [WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md)). Frontend
+   React + MapLibre z realną mapą jest planowany, ale nie jest jeszcze
+   zaimplementowany.
 
 ## Przepływ screeningu
 

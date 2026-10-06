@@ -174,9 +174,9 @@ efemeryczny kontener Postgres+PostGIS na czas testów, bez potrzeby ręcznej
 instalacji bazy w środowisku dev. Testy te oznaczone markerem `postgres` (jak
 `pywake`/`pvlib`) i pomijane, gdy Docker nie jest dostępny.
 
-**Otwarte pytanie do Ciebie:** czy masz dostęp do Dockera w środowisku, w
-którym te testy będą uruchamiane (lokalnie/CI)? Jeśli nie, alternatywą jest
-wskazanie już istniejącej instancji Postgres+PostGIS do testów.
+Rozstrzygnięte w sekcji 8: Docker jest dostępny w CI (GitHub-hosted runner),
+niekoniecznie lokalnie — testy `postgres` pomijają się tam, gdzie go
+zabraknie, i faktycznie uruchamiają się tam, gdzie jest.
 
 ## 4. Procesy robocze
 
@@ -274,10 +274,12 @@ następny — zgodnie z AGENTS.md.
 
 ## 8. Otwarte pytania — rozstrzygnięte
 
-- **Docker**: niedostępny w bieżącym środowisku sesji deweloperskiej, ale można
-  go wdrożyć w środowisku, gdzie faktycznie uruchamiane będą testy adaptera
-  Postgres (Krok 2). Do tego czasu testy `postgres` pozostają pominięte, tak
-  jak `pywake`/`pvlib` są dziś pomijane bez zainstalowanych zależności.
+- **Docker**: niedostępny w środowisku lokalnej sesji deweloperskiej, gdzie
+  napisano adapter Postgres (Krok 2) — testy `postgres` pomijają się tam tak
+  samo jak `pywake`/`pvlib` bez zainstalowanych zależności. Dostępny na
+  GitHub-hosted runnerach, więc CI ma osobny job `test-postgres`, który
+  faktycznie odpala testy przeciw efemerycznemu kontenerowi PostGIS —
+  to jedyne miejsce, gdzie ten adapter jest dziś zweryfikowany end-to-end.
 - **Frontend**: **monorepo** (`frontend/` w tym samym repozytorium) — jeden
   kontrakt API i UI zmieniane w tym samym PR, bez podwójnego wersjonowania
   między dwoma repozytoriami.
@@ -303,7 +305,26 @@ następny — zgodnie z AGENTS.md.
   bez zmian). Zweryfikowane testami (`tests/test_api.py`,
   `tests/test_memory_repositories.py`, marker `web`) oraz realnym serwerem
   `uvicorn` (nie tylko `TestClient`).
-- ⬜ Krok 2 — PostGIS + adaptery repozytoriów.
+- ✅ **Krok 2 — PostGIS + adaptery repozytoriów.**
+  `src/renewable_planner/adapters/postgres/` (`schema.py` — DDL, jedyne
+  źródło prawdy o schemacie; `repositories.py` — `PostgresProjectRepository`,
+  `PostgresAnalysisRunRepository`, `PostgresScreeningResultRepository`,
+  implementujące dokładnie te same porty co adaptery pamięciowe z Kroku 1).
+  Nowy opcjonalny extra `postgres` (`psycopg[binary]`, `alembic`). Migracja
+  Alembic w `migrations/` (`alembic upgrade head`) wykonuje ten sam
+  `SCHEMA_SQL`, który testy stosują wprost do efemerycznej bazy. `api/app.py`
+  przełącza się na te adaptery, gdy ustawiona jest zmienna `DATABASE_URL` —
+  bez tego (domyślnie) działa tak jak w Kroku 1. Tabele `sites`,
+  `spatial_constraints`, `spatial_data_layers` ze szkicu w sekcji 3.2 nie są
+  jeszcze potrzebne: granica i warstwy wciąż pochodzą z uploadowanych plików
+  (patrz sekcja 2.4), więc porty `SpatialRuleProvider`/
+  `SpatialDataLayerProvider` pozostają bez adaptera PostGIS do czasu, aż
+  automatyczne oficjalne źródła danych wejdą w zakres (patrz
+  [REQUIREMENTS.md](REQUIREMENTS.md#poza-zakresem-obecnej-wersji)).
+  Zweryfikowane testami (`tests/test_postgres_repositories.py`, marker
+  `postgres`) w osobnym jobie CI z Dockerem (GitHub-hosted runner) — lokalnie
+  w środowisku bez Dockera te testy pomijają się tak samo jak
+  `pywake`/`pvlib` bez zainstalowanej zależności.
 - ⬜ Krok 3 — tabela `jobs` + worker + `202`/polling.
 - ⬜ Krok 4 — frontend React + MapLibre.
 - ⬜ Krok 5 — `docker-compose`.

@@ -137,10 +137,9 @@ Poniższe funkcje nie są jeszcze zaimplementowane:
 
 - automatyczne pobieranie urzędowych danych przestrzennych i ocena ich
   kompletności dla danej lokalizacji;
-- trwałe repozytoria danych (PostGIS) — API webowe i Streamlit korzystają
-  obecnie z adapterów plikowych i repozytoriów w pamięci, które nie
-  przetrwają restartu procesu;
-- procesy robocze (worker) dla długich analiz uruchamianych przez API;
+- procesy robocze (worker) dla długich analiz uruchamianych przez API —
+  screening wykonuje się synchronicznie w ramach requestu, niezależnie od
+  tego, czy API korzysta z repozytoriów w pamięci czy PostGIS;
 - realny interfejs mapowy z podkładem geograficznym (frontend
   React + MapLibre) — Streamlit ma na razie schematyczny podgląd SVG bez
   georeferencji;
@@ -191,9 +190,12 @@ Obecna wersja:
 - bez zainstalowanych opcjonalnych extrasów (`pywake`, `pvlib`) używa
   wbudowanych, uproszczonych symulatorów — bez modelu wake i bez modelu
   inwertera PVWatts;
-- API webowe i repozytoria w pamięci to jawny, wczesny krok (Krok 1 w
+- API webowe domyślnie trzyma stan w repozytoriach w pamięci (Krok 1 w
   [WEB_ARCHITECTURE.md](WEB_ARCHITECTURE.md)) — stan nie przetrwa restartu
-  procesu i nie jest współdzielony między procesami roboczymi;
+  procesu, chyba że ustawiona jest zmienna `DATABASE_URL`, która włącza
+  trwałe repozytoria PostGIS (Krok 2); procesów roboczych (worker) nadal
+  brak, więc nawet z PostGIS screening wykonuje się synchronicznie w
+  ramach jednego requestu (Krok 3);
 - nie ma jeszcze realnego interfejsu mapowego (React/MapLibre) — dostępne są
   CLI, proste API i formularz Streamlit ze schematycznym podglądem SVG.
 

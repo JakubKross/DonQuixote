@@ -8,6 +8,11 @@ pytest
 pytest-cov
 ruff
 mypy
+testcontainers[postgres]>=4.7
+
+[postgres]
+psycopg[binary]>=3.2
+alembic>=1.13
 
 [pvlib]
 pvlib>=0.11

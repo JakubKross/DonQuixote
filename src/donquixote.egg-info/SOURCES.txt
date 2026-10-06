@@ -28,6 +28,9 @@ src/renewable_planner/adapters/geospatial/geojson_site_boundary.py
 src/renewable_planner/adapters/geospatial/geopandas_spatial_operations.py
 src/renewable_planner/adapters/geospatial/pyproj_crs_service.py
 src/renewable_planner/adapters/geospatial/wind_layout_geometry.py
+src/renewable_planner/adapters/postgres/__init__.py
+src/renewable_planner/adapters/postgres/repositories.py
+src/renewable_planner/adapters/postgres/schema.py
 src/renewable_planner/adapters/reporting/__init__.py
 src/renewable_planner/adapters/reporting/text.py
 src/renewable_planner/adapters/rules/__init__.py

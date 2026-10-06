@@ -35,3 +35,31 @@ jobs:
 
       - name: Type check
         run: mypy src
+
+      - name: Check Alembic migration renders (offline, no DB needed)
+        run: |
+          pip install -e ".[postgres]"
+          DATABASE_URL="postgresql+psycopg://user:pass@localhost/donquixote" \
+            alembic upgrade head --sql
+
+  test-postgres:
+    # Separate job: the postgres-marked tests spin up a real PostGIS
+    # container via testcontainers, which needs a reachable Docker daemon —
+    # available on GitHub-hosted ubuntu runners, unlike some local dev
+    # environments (where the tests skip cleanly instead, see
+    # docs/WEB_ARCHITECTURE.md section 3.4).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev,postgres]"
+
+      - name: Run PostGIS adapter tests
+        run: pytest -m postgres -v

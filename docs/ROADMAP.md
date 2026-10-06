@@ -76,10 +76,11 @@ Szczegółowy plan i status poszczególnych kroków prowadzi
 
 - ✅ Krok 1 — FastAPI na adapterach plikowych i repozytoriach w pamięci,
   działanie synchroniczne (`src/renewable_planner/api/`, extra `web`);
-- ⬜ Krok 2 — PostGIS i adaptery repozytoriów zastępujące repozytoria w
-  pamięci (obecnie stan nie przetrwa restartu procesu i nie jest
-  współdzielony między procesami roboczymi) — **następny priorytet**;
-- ⬜ Krok 3 — tabela `jobs`, worker i przełączenie API na `202`/polling;
+- ✅ Krok 2 — PostGIS i adaptery repozytoriów (`adapters/postgres/`, extra
+  `postgres`, migracja Alembic), włączane zmienną `DATABASE_URL` —
+  repozytoria w pamięci pozostają domyślne, gdy zmienna nie jest ustawiona;
+- ⬜ Krok 3 — tabela `jobs`, worker i przełączenie API na `202`/polling —
+  **następny priorytet**;
 - ⬜ Krok 4 — frontend React + MapLibre z realną mapą;
 - ⬜ Krok 5 — `docker-compose` do uruchomienia całości.
 

@@ -13,6 +13,7 @@ Requires-Dist: pytest; extra == "dev"
 Requires-Dist: pytest-cov; extra == "dev"
 Requires-Dist: ruff; extra == "dev"
 Requires-Dist: mypy; extra == "dev"
+Requires-Dist: testcontainers[postgres]>=4.7; extra == "dev"
 Provides-Extra: pywake
 Requires-Dist: py-wake>=2.6; extra == "pywake"
 Provides-Extra: pvlib
@@ -23,6 +24,9 @@ Provides-Extra: web
 Requires-Dist: fastapi>=0.110; extra == "web"
 Requires-Dist: uvicorn>=0.29; extra == "web"
 Requires-Dist: python-multipart>=0.0.9; extra == "web"
+Provides-Extra: postgres
+Requires-Dist: psycopg[binary]>=3.2; extra == "postgres"
+Requires-Dist: alembic>=1.13; extra == "postgres"
 
 # DonQuixote
 
