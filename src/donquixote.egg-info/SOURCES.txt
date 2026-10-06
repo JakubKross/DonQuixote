@@ -11,6 +11,7 @@ src/renewable_planner/__main__.py
 src/renewable_planner/cli.py
 src/renewable_planner/composition.py
 src/renewable_planner/streamlit_app.py
+src/renewable_planner/worker.py
 src/renewable_planner/adapters/__init__.py
 src/renewable_planner/adapters/battery_catalog.py
 src/renewable_planner/adapters/memory_repositories.py
@@ -29,6 +30,7 @@ src/renewable_planner/adapters/geospatial/geopandas_spatial_operations.py
 src/renewable_planner/adapters/geospatial/pyproj_crs_service.py
 src/renewable_planner/adapters/geospatial/wind_layout_geometry.py
 src/renewable_planner/adapters/postgres/__init__.py
+src/renewable_planner/adapters/postgres/jobs.py
 src/renewable_planner/adapters/postgres/repositories.py
 src/renewable_planner/adapters/postgres/schema.py
 src/renewable_planner/adapters/reporting/__init__.py
@@ -100,6 +102,7 @@ tests/test_geopandas_spatial_operations.py
 tests/test_grid_connection.py
 tests/test_memory_repositories.py
 tests/test_metric_spatial_context.py
+tests/test_postgres_repositories.py
 tests/test_project.py
 tests/test_pvlib_solar_integration.py
 tests/test_pyproj_crs_service.py

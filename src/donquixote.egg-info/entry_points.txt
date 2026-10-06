@@ -1,3 +1,4 @@
 [console_scripts]
 donquixote = renewable_planner.cli:main
+donquixote-worker = renewable_planner.worker:main
 renewable-planner = renewable_planner.cli:main

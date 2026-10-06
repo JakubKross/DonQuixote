@@ -6,16 +6,23 @@ verbatim for real deployments (so schema history is tracked); tests execute
 it directly against an ephemeral testcontainers database, which is faster
 and does not require Alembic to be configured just to run a test suite.
 
-Only the three tables needed to replace ``adapters.memory_repositories``
-(projects, analysis runs, screening results + their findings) are defined
-here. ``sites``, ``spatial_constraints`` and ``spatial_data_layers`` from the
-full schema sketch in WEB_ARCHITECTURE.md are not needed yet: the web API
-still reads site boundaries and rule/constraint layers from uploaded files
-(see ``ports.SpatialRuleProvider``/``SpatialDataLayerProvider``), which stays
-true until automatic official data sources are in scope.
+Only the tables needed to replace ``adapters.memory_repositories`` (projects,
+analysis runs, screening results + their findings) plus the ``jobs`` queue
+table (Step 3) are defined here. ``sites``, ``spatial_constraints`` and
+``spatial_data_layers`` from the full schema sketch in WEB_ARCHITECTURE.md
+are not needed yet: the web API still reads site boundaries and
+rule/constraint layers from uploaded files (see
+``ports.SpatialRuleProvider``/``SpatialDataLayerProvider``), which stays true
+until automatic official data sources are in scope.
+
+``JOBS_TABLE_SQL`` is split out from the rest so the Step 3 Alembic migration
+can apply just the new table (incrementally, like a normal migration) while
+still sharing the exact same DDL text that ``SCHEMA_SQL`` (and the test
+suite, which applies ``SCHEMA_SQL`` directly) uses — one definition, no risk
+of the two drifting apart.
 """
 
-SCHEMA_SQL = """
+_CORE_SCHEMA_SQL = """
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 CREATE TABLE IF NOT EXISTS projects (
@@ -78,3 +85,23 @@ CREATE INDEX IF NOT EXISTS constraint_findings_analysis_run_id_idx
 CREATE INDEX IF NOT EXISTS constraint_findings_affected_geometry_gix
     ON constraint_findings USING GIST (affected_geometry);
 """
+
+JOBS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS jobs (
+    id UUID PRIMARY KEY,
+    job_type TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    status TEXT NOT NULL,
+    analysis_run_id UUID REFERENCES analysis_runs (id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    locked_at TIMESTAMPTZ,
+    locked_by TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS jobs_status_created_at_idx
+    ON jobs (status, created_at);
+"""
+
+SCHEMA_SQL = _CORE_SCHEMA_SQL + JOBS_TABLE_SQL

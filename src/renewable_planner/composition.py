@@ -34,6 +34,7 @@ from renewable_planner.ports.screening import AnalysisRunRepository, SiteScreeni
 if TYPE_CHECKING:
     from renewable_planner.adapters.postgres import (
         PostgresAnalysisRunRepository,
+        PostgresJobRepository,
         PostgresProjectRepository,
         PostgresScreeningResultRepository,
     )
@@ -45,6 +46,7 @@ def build_file_screen_site(
     constraints_path: Path,
     rules_path: Path,
     *,
+    project: Project | None = None,
     analysis_run_repository: AnalysisRunRepository | None = None,
     result_repository: SiteScreeningResultRepository | None = None,
 ) -> tuple[ScreenSite, Project]:
@@ -60,8 +62,15 @@ def build_file_screen_site(
     API passes in process-shared adapters instead (see
     ``adapters.memory_repositories``) so a run created by one request can be
     read back by a later one.
+
+    ``project`` defaults to ``None``, in which case a fresh ``Project`` is
+    built from ``site``/``site_path`` (today's behaviour for CLI, Streamlit
+    and the synchronous web API). The worker (Step 3 of
+    docs/WEB_ARCHITECTURE.md) passes in the project already persisted at
+    enqueue time instead, so it wires the use case to the same project id
+    rather than minting a new one.
     """
-    project = build_project(site, site_path)
+    project = project or build_project(site, site_path)
     use_case = ScreenSite(
         project_repository=FileProjectRepository(project),
         site_repository=FileSiteRepository(site),
@@ -123,3 +132,20 @@ def build_postgres_repositories(
     runs = PostgresAnalysisRunRepository(dsn)
     results = PostgresScreeningResultRepository(dsn, runs)
     return projects, runs, results
+
+
+def build_postgres_job_repository(dsn: str) -> "PostgresJobRepository":
+    """Wire the Postgres-backed job queue (Step 3 of docs/WEB_ARCHITECTURE.md).
+
+    Mirrors ``build_postgres_repositories``: the ``psycopg`` import is
+    deferred so importing ``composition`` never requires the optional
+    ``postgres`` extra unless this function is actually called.
+    """
+    try:
+        from renewable_planner.adapters.postgres import PostgresJobRepository
+    except ImportError as error:
+        raise PostgresUnavailableError(
+            "the job queue requires the optional 'postgres' extra: pip install -e '.[postgres]'"
+        ) from error
+
+    return PostgresJobRepository(dsn)

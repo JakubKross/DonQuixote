@@ -20,6 +20,7 @@ dependencies = [
 [project.scripts]
 donquixote = "renewable_planner.cli:main"
 renewable-planner = "renewable_planner.cli:main"
+donquixote-worker = "renewable_planner.worker:main"
 
 
 [project.optional-dependencies]

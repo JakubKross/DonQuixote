@@ -5,16 +5,20 @@ depend on. This package is optional (extra ``postgres``) and is never
 imported by ``domain/``, ``application/`` or ``ports/``.
 """
 
+from renewable_planner.adapters.postgres.jobs import Job, PostgresJobRepository
 from renewable_planner.adapters.postgres.repositories import (
     PostgresAnalysisRunRepository,
     PostgresProjectRepository,
     PostgresScreeningResultRepository,
 )
-from renewable_planner.adapters.postgres.schema import SCHEMA_SQL
+from renewable_planner.adapters.postgres.schema import JOBS_TABLE_SQL, SCHEMA_SQL
 
 __all__ = [
+    "JOBS_TABLE_SQL",
     "SCHEMA_SQL",
+    "Job",
     "PostgresAnalysisRunRepository",
+    "PostgresJobRepository",
     "PostgresProjectRepository",
     "PostgresScreeningResultRepository",
 ]
